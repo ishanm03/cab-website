@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sachincabs - Premium Local & Outstation Cab Rental | Kolkata & Howrah</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-900">
+    
+    <!-- ============================================ -->
+    <!-- SECTION 1: HERO SECTION -->
+    <!-- ============================================ -->
+    <section id="hero" class="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center w-full">
+            
+            <!-- Left Column: Content -->
+            <div class="space-y-6">
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+                    Reliable Outstation & Local Cabs from Kolkata & Howrah
+                </h1>
+                <p class="text-lg md:text-xl text-slate-300 leading-relaxed">
+                    Transparent pricing. Verified drivers. Seamless WhatsApp booking within 2 minutes.
+                </p>
+                
+                <!-- WhatsApp Booking Button -->
+                <a href="#" class="inline-flex items-center gap-3 bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg pulse-button">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.01 1.01 4.31L2.5 22l6.26-1.5c1.26.64 2.68 1 4.24 1 5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.41 0-2.78-.33-3.98-.93l-1.45.35.35-1.45C4.33 14.78 4 13.41 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z"/>
+                    </svg>
+                    <span>Book Your Ride via WhatsApp</span>
+                </a>
+            </div>
+            
+            <!-- Right Column: Graphic/Icon Container -->
+            <div class="hidden md:flex justify-center items-center">
+                <div class="w-full h-96 bg-gradient-to-br from-amber-400 to-amber-300 rounded-2xl shadow-2xl flex items-center justify-center relative overflow-hidden">
+                    <!-- Geometric lines for premium feel -->
+                    <svg class="absolute w-full h-full opacity-10" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                        <line x1="0" y1="0" x2="400" y2="400" stroke="white" stroke-width="2"/>
+                        <line x1="400" y1="0" x2="0" y2="400" stroke="white" stroke-width="2"/>
+                        <circle cx="200" cy="200" r="100" fill="none" stroke="white" stroke-width="2"/>
+                        <circle cx="200" cy="200" r="150" fill="none" stroke="white" stroke-width="1"/>
+                    </svg>
+                    
+                    <!-- Car Icon -->
+                    <svg class="w-48 h-48 relative z-10" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+                        <g fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <!-- Car Body -->
+                            <path d="M 30 80 L 50 40 L 100 35 L 150 40 L 170 80"/>
+                            <path d="M 30 80 L 170 80 L 165 110 L 35 110 Z"/>
+                            <!-- Windows -->
+                            <rect x="55" y="50" width="35" height="25" fill="none"/>
+                            <rect x="110" y="50" width="35" height="25" fill="none"/>
+                            <!-- Wheels -->
+                            <circle cx="60" cy="110" r="12"/>
+                            <circle cx="140" cy="110" r="12"/>
+                            <!-- Headlights -->
+                            <circle cx="25" cy="85" r="4" fill="#1E293B"/>
+                            <circle cx="25" cy="92" r="4" fill="#1E293B"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+            
+        </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION 2: PRICING & ROUTES TABLE -->
+    <!-- ============================================ -->
+    <section id="pricing" class="py-16 md:py-24 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Section Header -->
+            <div class="text-center mb-12 md:mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+                    Popular Routes & Transparent Rates
+                </h2>
+                <p class="text-lg text-slate-600">
+                    No hidden charges. Tolls and taxes discussed upfront.
+                </p>
+            </div>
+
+            <!-- Desktop Table (Hidden on Mobile) -->
+            <div class="hidden md:block overflow-x-auto rounded-lg shadow-md">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900 text-white">
+                            <th class="px-6 py-4 text-left font-bold">Route</th>
+                            <th class="px-6 py-4 text-left font-bold">Sedan</th>
+                            <th class="px-6 py-4 text-left font-bold">SUV</th>
+                            <th class="px-6 py-4 text-left font-bold">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <!-- Row 1 -->
+                        <tr class="hover:bg-slate-100 transition-colors duration-200">
+                            <td class="px-6 py-4 font-semibold text-slate-900">Howrah Station / Kolkata City to Airport (CCU)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹999 (Fixed)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹1,499 (Fixed)</td>
+                            <td class="px-6 py-4 text-slate-600">Includes airport toll</td>
+                        </tr>
+                        <!-- Row 2 -->
+                        <tr class="hover:bg-slate-100 transition-colors duration-200">
+                            <td class="px-6 py-4 font-semibold text-slate-900">Kolkata / Howrah to Digha (One-Way)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹4,500</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹6,500</td>
+                            <td class="px-6 py-4 text-slate-600">Ideal for beach getaways</td>
+                        </tr>
+                        <!-- Row 3 -->
+                        <tr class="hover:bg-slate-100 transition-colors duration-200">
+                            <td class="px-6 py-4 font-semibold text-slate-900">Kolkata / Howrah to Mandarmani (Round-Trip)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹8,500 (2 Days)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹11,500 (2 Days)</td>
+                            <td class="px-6 py-4 text-slate-600">Driver allowance included</td>
+                        </tr>
+                        <!-- Row 4 -->
+                        <tr class="hover:bg-slate-100 transition-colors duration-200">
+                            <td class="px-6 py-4 font-semibold text-slate-900">Kolkata to Mayapur (Day Trip)</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹3,800</td>
+                            <td class="px-6 py-4 text-amber-600 font-bold">₹5,200</td>
+                            <td class="px-6 py-4 text-slate-600">12 Hours / 250 km limit</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Cards (Visible on Mobile Only) -->
+            <div class="md:hidden space-y-4">
+                <!-- Card 1 -->
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-500">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3">Howrah Station / Kolkata City to Airport (CCU)</h3>
+                    <div class="space-y-2 mb-3">
+                        <p class="text-sm text-slate-600"><span class="font-semibold">Sedan:</span> <span class="text-amber-600 font-bold">₹999 (Fixed)</span></p>
+                        <p class="text-sm text-slate-600"><span class="font-semibold">SUV:</span> <span class="text-amber-600 font-bold">₹1,499 (Fixed)</span></p>
+                    </div>
+                    <p class="text-sm text-slate-500 italic">Includes airport toll</p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-500">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3">Kolkata / Howrah to Digha (One-Way)</h3>
+                    <div class="space-y-2 mb-3">
+                        <p class="text-sm text-slate-600"><span class="font-semibold">Sedan:</span> <span class="text-amber-600 font-bold">₹4,500</span></p>
+                        <p class="text-sm text-slate-600"><span class="font-semibold">SUV:</span> <span class="text-amber-600 font-bold">₹6,500</span></p>
+                    </div>
+                    <p class="text-sm text-slate-500 italic">Ideal for beach getaways</p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-500">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3">Kolkata / Howrah to Mandarmani (Round-Trip)</h3>
+                    <div class="space-y-2 mb-3">
+                        <p class="text-sm text-slate-600"><span class="font-semibold">Sedan:</span> <span class="text-amber-600 font-bold">₹8,500 (2 Days)</span></p>
+                        <p class="text-sm text-slate-600"><span class="font-semibold">SUV:</span> <span class="text-amber-600 font-bold">₹11,500 (2 Days)</span></p>
+                    </div>
+                    <p class="text-sm text-slate-500 italic">Driver allowance included</p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-500">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3">Kolkata to Mayapur (Day Trip)</h3>
+                    <div class="space-y-2 mb-3">
+                        <p class="text-sm text-slate-600"><span class="font-semibold">Sedan:</span> <span class="text-amber-600 font-bold">₹3,800</span></p>
+                        <p class="text-sm text-slate-600"><span class="font-semibold">SUV:</span> <span class="text-amber-600 font-bold">₹5,200</span></p>
+                    </div>
+                    <p class="text-sm text-slate-500 italic">12 Hours / 250 km limit</p>
+                </div>
+            </div>
+
+            <!-- Footer Caption -->
+            <div class="mt-8 text-center">
+                <p class="text-sm text-slate-600 italic">
+                    <strong>Note:</strong> Outstation prices exclude state entry taxes and highway tolls where applicable.
+                </p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION 3: CONTACT & TRUST -->
+    <!-- ============================================ -->
+    <section id="contact" class="py-16 md:py-24 bg-slate-950 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16">
+                
+                <!-- Left Column: Contact Details -->
+                <div class="space-y-8">
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-bold mb-6">Get in Touch</h2>
+                        <p class="text-lg text-slate-300 leading-relaxed mb-8">
+                            Serving Kolkata, Howrah, and Hooghly districts 24/7. Reach out to us via phone or email for bookings and inquiries.
+                        </p>
+                    </div>
+
+                    <!-- Phone Numbers -->
+                    <div class="space-y-3">
+                        <h3 class="text-xl font-semibold text-amber-400">Phone</h3>
+                        <p class="text-slate-200">
+                            <a href="tel:+919876543210" class="hover:text-amber-400 transition-colors duration-200">+91 98765 43210</a>
+                        </p>
+                        <p class="text-slate-200">
+                            <a href="tel:+919123456789" class="hover:text-amber-400 transition-colors duration-200">+91 91234 56789</a>
+                        </p>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="space-y-3">
+                        <h3 class="text-xl font-semibold text-amber-400">Email</h3>
+                        <p class="text-slate-200">
+                            <a href="mailto:bookings@Sachincabs.com" class="hover:text-amber-400 transition-colors duration-200">bookings@Sachincabs.com</a>
+                        </p>
+                    </div>
+
+                    <!-- Operating Hours -->
+                    <div class="space-y-3">
+                        <h3 class="text-xl font-semibold text-amber-400">Hours</h3>
+                        <p class="text-slate-200">24/7 Service Available</p>
+                        <p class="text-sm text-slate-400">WhatsApp Response within 2 minutes during business hours</p>
+                    </div>
+                </div>
+
+                <!-- Right Column: Trust Badges -->
+                <div class="space-y-6">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-8">Why Choose Sachincabs</h2>
+                    
+                    <!-- Trust Badge 1 -->
+                    <div class="flex items-start gap-4 p-4 bg-slate-900 rounded-lg border border-slate-800 hover:border-amber-400 transition-colors duration-200">
+                        <div class="flex-shrink-0">
+                            <svg class="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg text-white">UPI Payments Accepted</h3>
+                            <p class="text-sm text-slate-400">Seamless digital payment options for your convenience</p>
+                        </div>
+                    </div>
+
+                    <!-- Trust Badge 2 -->
+                    <div class="flex items-start gap-4 p-4 bg-slate-900 rounded-lg border border-slate-800 hover:border-amber-400 transition-colors duration-200">
+                        <div class="flex-shrink-0">
+                            <svg class="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg text-white">Sanitized Cars</h3>
+                            <p class="text-sm text-slate-400">All vehicles maintained to highest hygiene standards</p>
+                        </div>
+                    </div>
+
+                    <!-- Trust Badge 3 -->
+                    <div class="flex items-start gap-4 p-4 bg-slate-900 rounded-lg border border-slate-800 hover:border-amber-400 transition-colors duration-200">
+                        <div class="flex-shrink-0">
+                            <svg class="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg text-white">Professional Drivers</h3>
+                            <p class="text-sm text-slate-400">Verified, experienced drivers with excellent track records</p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Script -->
+    <script src="app.js"></script>
+</body>
+</html>

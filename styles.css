@@ -1,0 +1,339 @@
+/* ============================================ */
+/* Custom Utility Overrides & Design Assets     */
+/* ============================================ */
+
+/* Root CSS Variables */
+:root {
+    --color-primary-amber: #F59E0B;
+    --color-primary-amber-light: #FBBF24;
+    --color-slate-dark: #1E293B;
+    --color-slate-midnight: #0F172A;
+    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Global Styles */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================ */
+/* Animations                                  */
+/* ============================================ */
+
+/* Pulse Effect for WhatsApp Button */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.4);
+    }
+    50% {
+        box-shadow: 0 20px 40px -10px rgba(34, 197, 94, 0.6);
+    }
+}
+
+.pulse-button {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth Fade In Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn var(--transition-smooth) ease-out;
+}
+
+/* Smooth Slide In from Left */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in-left {
+    animation: slideInLeft var(--transition-smooth) ease-out;
+}
+
+/* ============================================ */
+/* Typography Enhancements                     */
+/* ============================================ */
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+p {
+    line-height: 1.6;
+}
+
+/* ============================================ */
+/* Button Enhancements                         */
+/* ============================================ */
+
+button, a[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    user-select: none;
+}
+
+button:active,
+a[role="button"]:active {
+    transform: translateY(2px);
+}
+
+/* ============================================ */
+/* Table Styling                               */
+/* ============================================ */
+
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+thead tr {
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+}
+
+tbody tr {
+    transition: background-color var(--transition-smooth), box-shadow var(--transition-smooth);
+}
+
+tbody tr:hover {
+    background-color: #F1F5F9;
+    box-shadow: inset 0 0 0 1px #E2E8F0;
+}
+
+td, th {
+    border-color: #E2E8F0;
+}
+
+/* ============================================ */
+/* Card Styling                                */
+/* ============================================ */
+
+.card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-smooth);
+}
+
+.card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Trust Badge Cards Enhancement */
+.trust-badge {
+    position: relative;
+    overflow: hidden;
+}
+
+.trust-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left var(--transition-smooth);
+}
+
+.trust-badge:hover::before {
+    left: 100%;
+}
+
+/* ============================================ */
+/* Hero Section Enhancements                   */
+/* ============================================ */
+
+#hero {
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+#hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+#hero > div {
+    position: relative;
+    z-index: 1;
+}
+
+#hero h1 {
+    font-size: clamp(2.5rem, 8vw, 3.75rem);
+    line-height: 1.2;
+}
+
+#hero p {
+    font-size: clamp(1.125rem, 3vw, 1.5rem);
+}
+
+/* ============================================ */
+/* Pricing Section                             */
+/* ============================================ */
+
+#pricing {
+    scroll-behavior: smooth;
+}
+
+#pricing h2 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ============================================ */
+/* Contact Section                             */
+/* ============================================ */
+
+#contact {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+}
+
+#contact h2 {
+    color: white;
+    font-size: clamp(2rem, 6vw, 3rem);
+}
+
+#contact a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition-smooth);
+}
+
+#contact a:hover {
+    border-bottom-color: var(--color-primary-amber);
+}
+
+/* ============================================ */
+/* Responsive Design Adjustments              */
+/* ============================================ */
+
+/* Extra Small Devices */
+@media (max-width: 640px) {
+    table {
+        font-size: 0.875rem;
+    }
+    
+    td, th {
+        padding: 0.75rem 0.5rem !important;
+    }
+}
+
+/* Small Devices */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+    }
+    
+    section {
+        padding: 3rem 1rem;
+    }
+}
+
+/* Large Devices */
+@media (min-width: 1024px) {
+    .container {
+        max-width: 80rem;
+    }
+    
+    section {
+        padding: 6rem 2rem;
+    }
+}
+
+/* ============================================ */
+/* Accessibility Improvements                 */
+/* ============================================ */
+
+/* Focus visible for keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--color-primary-amber);
+    outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #0F172A;
+        color: #F1F5F9;
+    }
+}
+
+/* ============================================ */
+/* Print Styles                               */
+/* ============================================ */
+
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    #hero,
+    #contact {
+        background: white;
+        color: black;
+    }
+    
+    .pulse-button,
+    a {
+        text-decoration: underline;
+    }
+}
