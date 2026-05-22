@@ -1,6 +1,6 @@
-# Prompt: Create a Modular Landing Page for 'SethCabs'
+# Prompt: Create a Modular Landing Page for 'SachinCabs'
 
-You are an expert Frontend Engineer and UI/UX Designer. Your task is to generate a pristine, highly responsive landing page for a premium local cab rental business named **SethCabs**, operating out of Kolkata and Howrah.
+You are an expert Frontend Engineer and UI/UX Designer. Your task is to generate a pristine, highly responsive landing page for a premium local cab rental business named **SachinCabs**, operating out of Kolkata and Howrah.
 
 ## 🛠️ Architecture Rules (Crucial for VS Code Setup)
 To maximize the effectiveness of GitHub Copilot, cleanly separate the logic into three files:
