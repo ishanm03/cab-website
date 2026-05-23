@@ -1,50 +1,72 @@
 /* ============================================ */
-/* Custom Utility Overrides & Design Assets     */
+/* PLAYFUL MODERN DESIGN SYSTEM                */
+/* SachinCabs Website                          */
 /* ============================================ */
 
-/* Root CSS Variables */
+/* ============================================ */
+/* DESIGN TOKENS                               */
+/* ============================================ */
+
 :root {
-    --color-primary-amber: #F59E0B;
-    --color-primary-amber-light: #FBBF24;
-    --color-slate-dark: #1E293B;
-    --color-slate-midnight: #0F172A;
+    /* Color Palette */
+    --color-amber-primary: #F59E0B;
+    --color-amber-light: #FBBF24;
+    --color-coral-primary: #FF6B9D;
+    --color-emerald-primary: #10B981;
+    --color-navy-primary: #1E293B;
+    --color-cream-primary: #FFFBF0;
+    --color-slate-dark: #1F2937;
+    --color-slate-medium: #374151;
+    --color-slate-light: #D1D5DB;
+    
+    /* Shadows - Soft & Warm */
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --shadow-medium: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --shadow-warm: 0 10px 40px rgba(245, 158, 11, 0.1);
+    
+    /* Transitions */
     --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-subtle: 0.5s ease-out;
+    
+    /* Spacing Base */
+    --spacing-base: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
 }
 
-/* Global Styles */
+/* ============================================ */
+/* GLOBAL STYLES                               */
+/* ============================================ */
+
 * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    color: #1F2937;
+    line-height: 1.6;
 }
 
 /* ============================================ */
-/* Animations                                  */
+/* ANIMATIONS                                  */
 /* ============================================ */
 
-/* Pulse Effect for WhatsApp Button */
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.4);
-    }
-    50% {
-        box-shadow: 0 20px 40px -10px rgba(34, 197, 94, 0.6);
-    }
-}
-
-.pulse-button {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Smooth Fade In Animation */
-@keyframes fadeIn {
+/* Gentle Fade In */
+@keyframes gentle-fade-in {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(12px);
     }
     to {
         opacity: 1;
@@ -52,103 +74,332 @@ body {
     }
 }
 
-.fade-in {
-    animation: fadeIn var(--transition-smooth) ease-out;
-}
-
-/* Smooth Slide In from Left */
-@keyframes slideInLeft {
+/* Subtle Lift Effect */
+@keyframes subtle-lift {
     from {
-        opacity: 0;
-        transform: translateX(-30px);
+        transform: translateY(0);
     }
     to {
-        opacity: 1;
-        transform: translateX(0);
+        transform: translateY(-4px);
     }
 }
 
-.slide-in-left {
-    animation: slideInLeft var(--transition-smooth) ease-out;
+/* Gentle Pulse */
+@keyframes gentle-pulse {
+    0%, 100% {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    50% {
+        box-shadow: 0 8px 30px rgba(245, 158, 11, 0.15);
+    }
+}
+
+/* Pulse Button Animation */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+    }
+    50% {
+        box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.6);
+    }
+}
+
+.pulse-button {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ============================================ */
-/* Typography Enhancements                     */
+/* TYPOGRAPHY                                  */
 /* ============================================ */
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: #1E293B;
+}
+
+h1 {
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+}
+
+h2 {
+    font-size: clamp(2rem, 5vw, 3rem);
+}
+
+h3 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
 }
 
 p {
-    line-height: 1.6;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #4B5563;
 }
 
 /* ============================================ */
-/* Button Enhancements                         */
-/* ============================================ */
-
-button, a[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-    cursor: pointer;
-    transition: all var(--transition-smooth);
-    user-select: none;
-}
-
-button:active,
-a[role="button"]:active {
-    transform: translateY(2px);
-}
-
-/* ============================================ */
-/* Table Styling                               */
-/* ============================================ */
-
-table {
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-thead tr {
-    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-}
-
-tbody tr {
-    transition: background-color var(--transition-smooth), box-shadow var(--transition-smooth);
-}
-
-tbody tr:hover {
-    background-color: #F1F5F9;
-    box-shadow: inset 0 0 0 1px #E2E8F0;
-}
-
-td, th {
-    border-color: #E2E8F0;
-}
-
-/* ============================================ */
-/* Card Styling                                */
+/* COMPONENT: CARD                             */
 /* ============================================ */
 
 .card {
     background: white;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-soft);
     transition: all var(--transition-smooth);
+    border: 1px solid rgba(241, 245, 249, 0.6);
 }
 
 .card:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-4px);
+    border-color: var(--color-amber-primary);
 }
 
-/* Trust Badge Cards Enhancement */
+/* Card Variant: Route */
+.card-route {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFFBF0 100%);
+    border-left: 4px solid var(--color-amber-primary);
+}
+
+.card-route:hover {
+    border-left-color: var(--color-coral-primary);
+}
+
+/* Card Variant: Testimonial */
+.card-testimonial {
+    background: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-top: 3px solid var(--color-amber-primary);
+}
+
+.card-testimonial:hover {
+    border-top-color: var(--color-coral-primary);
+}
+
+/* Card Variant: Benefit */
+.card-benefit {
+    text-align: center;
+    background: linear-gradient(135deg, #FFFBF0 0%, #FFFFFF 100%);
+}
+
+/* Card Variant: Fleet */
+.card-fleet {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F3F4F6 100%);
+}
+
+/* ============================================ */
+/* COMPONENT: ICON WRAPPER                     */
+/* ============================================ */
+
+.icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, var(--color-amber-primary), var(--color-coral-primary));
+    color: white;
+    flex-shrink: 0;
+    transition: all var(--transition-smooth);
+}
+
+.icon-wrapper svg {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+/* Icon Wrapper Variants */
+.icon-wrapper.benefit-icon {
+    background: linear-gradient(135deg, #FEF3C7, #FED7AA);
+    color: var(--color-amber-primary);
+}
+
+.icon-wrapper.pricing {
+    background: linear-gradient(135deg, #A7F3D0, #6EE7B7);
+    color: var(--color-emerald-primary);
+}
+
+.icon-wrapper.verified {
+    background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+    color: var(--color-emerald-primary);
+}
+
+.icon-wrapper.support {
+    background: linear-gradient(135deg, #FFE4E6, #FBCFE8);
+    color: var(--color-coral-primary);
+}
+
+.icon-wrapper.local {
+    background: linear-gradient(135deg, #E0E7FF, #C7D2FE);
+    color: #4F46E5;
+}
+
+/* Route Icon Variants */
+.icon-wrapper.airport {
+    background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+    color: #3B82F6;
+}
+
+.icon-wrapper.beach {
+    background: linear-gradient(135deg, #FEF08A, #FDE047);
+    color: #CA8A04;
+}
+
+.icon-wrapper.temple {
+    background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+    color: #3B82F6;
+}
+
+.icon-wrapper.daytrip {
+    background: linear-gradient(135deg, #FFE4E6, #FBCFE8);
+    color: var(--color-coral-primary);
+}
+
+/* Badge Icon Variants */
+.badge-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all var(--transition-smooth);
+}
+
+.badge-icon.verified-badge {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.badge-icon.transparent-badge {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.badge-icon.support-badge {
+    background: rgba(255, 107, 157, 0.1);
+}
+
+.badge-icon.safe-badge {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* ============================================ */
+/* COMPONENT: BADGE                            */
+/* ============================================ */
+
+.badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all var(--transition-smooth);
+}
+
+.badge-airport {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.badge-beach {
+    background: #FEF08A;
+    color: #854D0E;
+}
+
+.badge-temple {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.badge-daytrip {
+    background: #FFE4E6;
+    color: #9F1239;
+}
+
+/* ============================================ */
+/* COMPONENT: PRICE TIER                       */
+/* ============================================ */
+
+.price-tier {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #F3F4F6;
+    font-size: 0.9rem;
+}
+
+.price-tier:last-child {
+    border-bottom: none;
+}
+
+.price-tier-label {
+    color: #6B7280;
+    font-weight: 500;
+}
+
+.price-tier-value {
+    color: var(--color-amber-primary);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* ============================================ */
+/* COMPONENT: FLEET CARD                       */
+/* ============================================ */
+
+.fleet-card {
+    border: 2px solid #F3F4F6;
+}
+
+.fleet-card:hover {
+    border-color: var(--color-amber-primary);
+}
+
+.specs {
+    font-size: 0.9rem;
+}
+
+.specs p {
+    color: #6B7280;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ============================================ */
+/* COMPONENT: TESTIMONIAL                      */
+/* ============================================ */
+
+.stars {
+    font-size: 1.25rem;
+    letter-spacing: 0.25rem;
+}
+
+.author {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* ============================================ */
+/* COMPONENT: TRUST BADGE                      */
+/* ============================================ */
+
 .trust-badge {
     position: relative;
     overflow: hidden;
+    transition: all var(--transition-smooth);
 }
 
 .trust-badge::before {
@@ -160,6 +411,7 @@ td, th {
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
     transition: left var(--transition-smooth);
+    pointer-events: none;
 }
 
 .trust-badge:hover::before {
@@ -167,7 +419,31 @@ td, th {
 }
 
 /* ============================================ */
-/* Hero Section Enhancements                   */
+/* INTERACTIVE STATES                          */
+/* ============================================ */
+
+button, a[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    user-select: none;
+    border: none;
+}
+
+button:hover, 
+a[role="button"]:hover {
+    transform: translateY(-2px);
+}
+
+button:active,
+a[role="button"]:active {
+    transform: translateY(0);
+}
+
+/* ============================================ */
+/* SECTION: HERO                               */
 /* ============================================ */
 
 #hero {
@@ -195,8 +471,155 @@ td, th {
 }
 
 #hero h1 {
-    font-size: clamp(2.5rem, 8vw, 3.75rem);
-    line-height: 1.2;
+    color: white;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+#hero span {
+    color: var(--color-amber-primary);
+    position: relative;
+    display: inline-block;
+}
+
+#hero p {
+    color: #E5E7EB;
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+#hero img {
+    display: flex;
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 1rem;
+}
+
+/* ============================================ */
+/* SECTION: BENEFITS                           */
+/* ============================================ */
+
+#benefits {
+    background: linear-gradient(180deg, #FFFBF0 0%, #FFFFFF 100%);
+}
+
+#benefits .card {
+    background: white;
+}
+
+/* ============================================ */
+/* SECTION: PRICING                            */
+/* ============================================ */
+
+#pricing {
+    background: linear-gradient(180deg, #FFFBF0 0%, #FFFFFF 100%);
+}
+
+/* ============================================ */
+/* SECTION: FLEET                              */
+/* ============================================ */
+
+#fleet {
+    background: linear-gradient(180deg, #F9FAFB 0%, #FFFFFF 100%);
+}
+
+#fleet .fleet-card h3 {
+    color: #1E293B;
+    font-size: 1.5rem;
+}
+
+/* ============================================ */
+/* SECTION: TESTIMONIALS                       */
+/* ============================================ */
+
+#testimonials {
+    background: linear-gradient(180deg, #FFFBF0 0%, #FFFFFF 100%);
+}
+
+/* ============================================ */
+/* SECTION: CONTACT                            */
+/* ============================================ */
+
+#contact {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+    color: white;
+}
+
+#contact h2 {
+    color: white;
+    font-size: 2rem;
+}
+
+#contact h3 {
+    color: var(--color-amber-primary);
+    font-size: 1.25rem;
+}
+
+#contact a {
+    color: #E5E7EB;
+    text-decoration: none;
+    transition: color var(--transition-smooth);
+}
+
+#contact a:hover {
+    color: var(--color-amber-primary);
+}
+
+/* ============================================ */
+/* RESPONSIVE DESIGN                           */
+/* ============================================ */
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+    }
+    
+    h3 {
+        font-size: 1.25rem;
+    }
+    
+    .card {
+        padding: 1.25rem;
+    }
+    
+    .icon-wrapper {
+        width: 3.5rem;
+        height: 3.5rem;
+    }
+    
+    .icon-wrapper svg {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+}
+
+@media (max-width: 640px) {
+    h1 {
+        font-size: 1.75rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    p {
+        font-size: 0.95rem;
+    }
+    
+    .card {
+        padding: 1rem;
+        border-radius: 0.75rem;
+    }
+    
+    .badge {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.65rem;
+    }
 }
 
 #hero p {
