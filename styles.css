@@ -109,6 +109,106 @@ body {
 }
 
 /* ============================================ */
+/* COMPONENT: BRAND LABEL (FIXED TOP-LEFT)    */
+/* ============================================ */
+
+.brand-label {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 9999;
+    background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+    color: #1E293B;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 2rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+    transition: all var(--transition-smooth);
+    cursor: pointer;
+}
+
+.brand-label:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(245, 158, 11, 0.4);
+}
+
+.brand-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+.brand-text {
+    display: inline;
+}
+
+/* Responsive: Smaller on mobile */
+@media (max-width: 640px) {
+    .brand-label {
+        top: 12px;
+        left: 12px;
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .brand-icon {
+        width: 1rem;
+        height: 1rem;
+    }
+}
+
+/* Responsive: Medium on tablet */
+@media (max-width: 768px) and (min-width: 641px) {
+    .brand-label {
+        top: 16px;
+        left: 16px;
+    }
+}
+
+/* ============================================ */
+/* COMPONENT: CALL BUTTON                      */
+/* ============================================ */
+
+.call-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: white;
+    color: #1E293B;
+    border: 2px solid #1E293B;
+    text-decoration: none;
+    transition: all var(--transition-smooth);
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.call-button:hover {
+    background: #1E293B;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(30, 41, 59, 0.25);
+}
+
+.call-button:focus-visible {
+    outline: 2px solid #F59E0B;
+    outline-offset: 2px;
+}
+
+.call-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* ============================================ */
 /* TYPOGRAPHY                                  */
 /* ============================================ */
 
