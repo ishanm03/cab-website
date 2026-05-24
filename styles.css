@@ -202,6 +202,23 @@ body {
 }
 
 /* ============================================ */
+/* COMPONENT: WHATSAPP BUTTON                  */
+/* ============================================ */
+
+a[href*="wa.me"] {
+    color: #FFFFFF !important;
+}
+
+a[href*="wa.me"] span {
+    color: #FFFFFF !important;
+}
+
+a[href*="wa.me"] svg {
+    color: #FFFFFF !important;
+    fill: currentColor;
+}
+
+/* ============================================ */
 /* TYPOGRAPHY                                  */
 /* ============================================ */
 
