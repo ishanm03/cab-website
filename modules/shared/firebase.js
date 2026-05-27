@@ -7,12 +7,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase
 // Firebase configuration for IshanCabs (Free Tier)
 // REPLACE these placeholders with your actual keys from the Firebase Console!
 const firebaseConfig = {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "your-project-id.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyBme0T8UUyEOOjap27gF0NHI2ZRsjAb8Ec",
+    authDomain: "ishancabproject.firebaseapp.com",
+    projectId: "ishancabproject",
+    storageBucket: "ishancabproject.firebasestorage.app",
+    messagingSenderId: "127785774256",
+    appId: "1:127785774256:web:8748f93ffc638d306edf75"
 };
 
 // Initialize Firebase
