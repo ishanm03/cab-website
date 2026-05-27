@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join IshanCabs - Premium Rides | Kolkata & Howrah</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Global & Local Custom Styles -->
+    <link rel="stylesheet" href="../../styles.css">
+    <link rel="stylesheet" href="auth.css">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
+    
+    <!-- Background glowing accents -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-amber-500/10 blur-3xl"></div>
+        <div class="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-coral-500/10 blur-3xl"></div>
+    </div>
+
+    <!-- Main Auth Card -->
+    <main class="w-full max-w-md bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl p-8 relative z-10 auth-card">
+        
+        <!-- Brand Header -->
+        <div class="text-center mb-8">
+            <a href="../../index.html" class="inline-flex items-center gap-2 mb-3 hover:scale-105 transition-transform duration-300">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-300 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z"/>
+                    </svg>
+                </div>
+                <span class="text-2xl font-bold tracking-tight text-white">IshanCabs</span>
+            </a>
+            <h1 class="text-3xl font-extrabold" id="auth-title">Welcome Rider</h1>
+            <p class="text-slate-400 text-sm mt-2" id="auth-subtitle">Verify your identity to book premium rides</p>
+        </div>
+
+        <!-- Alert Notification Panel -->
+        <div id="auth-alert" class="hidden"></div>
+
+        <!-- Loading Spinner overlay -->
+        <div id="auth-loader" class="hidden flex flex-col items-center justify-center py-8">
+            <div class="spinner border-4 border-amber-500 border-t-transparent rounded-full w-12 h-12 animate-spin mb-4"></div>
+            <p class="text-sm text-slate-300" id="loader-text">Loading...</p>
+        </div>
+
+        <!-- AUTH METHODS SECTION -->
+        <div id="auth-methods-panel" class="space-y-6">
+            <!-- Tabs Navigation -->
+            <div class="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                <button type="button" id="tab-google" class="flex-1 py-3 text-sm font-semibold rounded-xl text-amber-500 bg-slate-900 transition-all duration-300">
+                    Google Sign-In
+                </button>
+                <button type="button" id="tab-phone" class="flex-1 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300">
+                    Phone & OTP
+                </button>
+            </div>
+
+            <!-- Tab 1: Google Panel -->
+            <div id="panel-google" class="space-y-4">
+                <button type="button" id="btn-google-login" class="w-full flex items-center justify-center gap-3 bg-white text-slate-900 font-bold py-4 px-6 rounded-2xl hover:bg-slate-100 transition-all duration-300 transform active:scale-95 shadow-lg shadow-white/5">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+                <p class="text-xs text-slate-500 text-center">We will never post anything without your permission.</p>
+            </div>
+
+            <!-- Tab 2: Phone Panel -->
+            <div id="panel-phone" class="hidden space-y-6">
+                <!-- Phone Number Form -->
+                <form id="phone-number-form" class="space-y-4">
+                    <div>
+                        <label for="phone-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Phone Number</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold border-r border-slate-800 pr-3">+91</span>
+                            <input type="tel" id="phone-input" placeholder="Enter 10-digit number" required class="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 text-white pl-16 pr-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium tracking-wide">
+                        </div>
+                    </div>
+
+                    <!-- Invisible Recaptcha Area -->
+                    <div id="recaptcha-container" class="my-2"></div>
+
+                    <button type="submit" id="btn-send-otp" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-amber-500/20">
+                        Send Verification Code
+                    </button>
+                </form>
+
+                <!-- Hidden OTP input form -->
+                <form id="otp-verification-form" class="hidden space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="otp-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">One-Time Password (OTP)</label>
+                            <button type="button" id="btn-change-number" class="text-xs font-semibold text-amber-500 hover:underline">Change Number</button>
+                        </div>
+                        <input type="text" id="otp-input" placeholder="Enter 6-digit OTP" maxLength="6" required class="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 text-white text-center text-xl font-bold py-4 rounded-2xl outline-none transition-all duration-300 tracking-[0.5em]">
+                    </div>
+
+                    <button type="submit" id="btn-verify-otp" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-emerald-500/20">
+                        Verify & Continue
+                    </button>
+
+                    <div class="text-center">
+                        <button type="button" id="btn-resend-otp" class="text-xs font-semibold text-slate-500 hover:text-amber-500 transition-colors duration-200">
+                            Didn't receive the OTP? Resend
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- PROFILE COMPLETION PANEL (Slides in dynamically if first time signup) -->
+        <div id="profile-completion-panel" class="hidden space-y-6">
+            <div class="text-center mb-2">
+                <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold">Almost There!</h2>
+                <p class="text-slate-400 text-sm mt-1">Please provide details to complete your registration</p>
+            </div>
+
+            <form id="profile-completion-form" class="space-y-4">
+                <!-- Name input -->
+                <div>
+                    <label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Full Name</label>
+                    <input type="text" id="profile-name" placeholder="E.g. Priya Dey" required class="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                </div>
+
+                <!-- City input -->
+                <div>
+                    <label for="profile-city" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Operating City</label>
+                    <select id="profile-city" required class="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
+                        <option value="" disabled selected>Select your city</option>
+                        <option value="Kolkata">Kolkata</option>
+                        <option value="Howrah">Howrah</option>
+                        <option value="Hooghly">Hooghly / Other</option>
+                    </select>
+                </div>
+
+                <!-- Phone input (Google users need to provide Phone) -->
+                <div id="profile-phone-container" class="hidden">
+                    <label for="profile-phone" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Phone Number</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold border-r border-slate-800 pr-3">+91</span>
+                        <input type="tel" id="profile-phone" placeholder="Enter 10-digit number" class="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500 text-white pl-16 pr-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-amber-500/20 mt-2">
+                    Complete Registration
+                </button>
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Main Controller Loader Script -->
+    <script type="module" src="authUI.js"></script>
+</body>
+</html>
