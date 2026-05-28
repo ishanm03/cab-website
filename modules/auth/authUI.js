@@ -4,7 +4,7 @@ import { authService } from "./authService.js";
 import { dbService } from "../shared/dbService.js";
 import { utils } from "../shared/utils.js";
 import { auth as firebaseAuth } from "../shared/firebase.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // DOM Element Handles
 const tabGoogle = document.getElementById("tab-google");
@@ -70,9 +70,21 @@ function initUI() {
     // 6. Complete Profile Submission
     profileCompletionForm.addEventListener("submit", handleProfileCompletionSubmit);
 
-    // 7. Track User Authentication State Change
+    // 7. Track User Authentication State Change & Resolve Redirect results
     if (firebaseAuth) {
         onAuthStateChanged(firebaseAuth, handleAuthStateChange);
+        
+        // Resolve pending redirect credentials
+        getRedirectResult(firebaseAuth)
+            .then((result) => {
+                if (result) {
+                    console.log("IshanCabs: Redirect sign-in succeeded for user:", result.user.uid);
+                }
+            })
+            .catch((error) => {
+                console.error("IshanCabs: Redirect sign-in failed:", error);
+                utils.showAlert(authAlert, "Authentication failed: " + error.message);
+            });
     }
 }
 
