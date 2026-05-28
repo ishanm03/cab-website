@@ -1,0 +1,43 @@
+{
+  "sedan": [
+    {
+      "driver_name": "Rajesh Kumar",
+      "driver_phone": "+918981538038",
+      "vehicle_number": "WB-02-A-1111"
+    },
+    {
+      "driver_name": "Amit Singh",
+      "driver_phone": "+919876543211",
+      "vehicle_number": "WB-02-A-2222"
+    },
+    {
+      "driver_name": "Pritam Dey",
+      "driver_phone": "+919876543213",
+      "vehicle_number": "WB-02-A-4444"
+    }
+  ],
+  "suv": [
+    {
+      "driver_name": "Subhasis Roy",
+      "driver_phone": "+919876543215",
+      "vehicle_number": "WB-02-B-6666"
+    },
+    {
+      "driver_name": "Vikram Sen",
+      "driver_phone": "+919876543216",
+      "vehicle_number": "WB-02-B-7777"
+    }
+  ],
+  "muv": [
+    {
+      "driver_name": "Deepak Patel",
+      "driver_phone": "+919876543212",
+      "vehicle_number": "WB-02-C-9999"
+    },
+    {
+      "driver_name": "Sanjay Shaw",
+      "driver_phone": "+919876543217",
+      "vehicle_number": "WB-02-C-0000"
+    }
+  ]
+}

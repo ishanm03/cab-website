@@ -586,7 +586,7 @@ a[role="button"]:active {
     letter-spacing: -0.03em;
 }
 
-#hero span {
+#hero h1 span {
     color: var(--color-amber-primary);
     position: relative;
     display: inline-block;

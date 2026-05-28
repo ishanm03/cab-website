@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Premium Ride - IshanCabs</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Global & Local Custom Styles -->
+    <link rel="stylesheet" href="../../styles.css">
+    <link rel="stylesheet" href="booking.css">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="w-full bg-slate-900/60 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <a href="../../index.html" class="flex items-center gap-2 hover:scale-105 transition-transform duration-300">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-300 flex items-center justify-center text-white shadow-md">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z"/>
+                    </svg>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-white">IshanCabs</span>
+            </a>
+            
+            <div class="flex items-center gap-4">
+                <span id="rider-welcome" class="text-sm font-semibold text-slate-300 hidden sm:inline">Loading...</span>
+                <button type="button" id="btn-rider-logout" class="inline-flex items-center gap-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-rose-400 font-semibold py-2 px-4 rounded-xl transition-all duration-300 transform active:scale-95 text-xs">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Background glowing accents -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="absolute top-20 left-1/4 w-96 h-96 rounded-full bg-amber-500/5 blur-3xl"></div>
+        <div class="absolute bottom-20 right-1/4 w-96 h-96 rounded-full bg-coral-500/5 blur-3xl"></div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <main class="flex-grow flex items-center justify-center p-4 relative z-10 my-8 sm:my-12">
+        <div class="w-full max-w-2xl bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl p-6 sm:p-10 auth-card">
+            
+            <!-- Step Navigation Progress Bar -->
+            <nav class="flex items-center justify-between mb-6 max-w-md mx-auto relative">
+                <!-- Connective Progress Line -->
+                <div class="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-800 w-full z-0"></div>
+                <div id="booking-progress-bar" class="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-amber-500 w-0 transition-all duration-500 z-0"></div>
+
+                <!-- Step 1 Indicator -->
+                <div class="relative z-10 flex flex-col items-center">
+                    <div id="step-dot-1" class="w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-bold flex items-center justify-center text-sm shadow-md transition-all duration-300 ring-4 ring-amber-500/20">1</div>
+                    <span id="step-text-1" class="text-xs font-semibold text-amber-500 mt-2">Route Setup</span>
+                </div>
+
+                <!-- Step 2 Indicator -->
+                <div class="relative z-10 flex flex-col items-center">
+                    <div id="step-dot-2" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 font-bold flex items-center justify-center text-sm shadow-md transition-all duration-300">2</div>
+                    <span id="step-text-2" class="text-xs font-semibold text-slate-500 mt-2">Fleet Details</span>
+                </div>
+
+                <!-- Step 3 Indicator -->
+                <div class="relative z-10 flex flex-col items-center">
+                    <div id="step-dot-3" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 font-bold flex items-center justify-center text-sm shadow-md transition-all duration-300">3</div>
+                    <span id="step-text-3" class="text-xs font-semibold text-slate-500 mt-2">Dispatch</span>
+                </div>
+            </nav>
+
+            <!-- Alert Notification Panel -->
+            <div id="booking-alert" class="hidden"></div>
+
+            <!-- Loader Indicator -->
+            <div id="booking-loader" class="hidden flex flex-col items-center justify-center py-12">
+                <div class="spinner border-4 border-amber-500 border-t-transparent rounded-full w-12 h-12 animate-spin mb-4"></div>
+                <p class="text-sm text-slate-300 font-medium" id="booking-loader-text">Loading...</p>
+            </div>
+
+            <!-- STEP 1 PANEL: ROUTE & TIMING SETUP -->
+            <section id="panel-step-1" class="space-y-6">
+                <div class="border-b border-slate-800 pb-4 mb-6">
+                    <h2 class="text-3xl font-extrabold text-amber-500">Select Your Journey</h2>
+                    <p class="text-slate-400 text-xs mt-1">Provide pickup nodes, categories, and pickup timing.</p>
+                </div>
+
+                <form id="form-step-1" class="space-y-6">
+                    <!-- Pickup Select -->
+                    <div>
+                        <label for="pickup-select" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Pickup Location</label>
+                        <select id="pickup-select" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
+                            <option value="" disabled selected>Loading locations...</option>
+                        </select>
+                    </div>
+
+                    <!-- Drop Select -->
+                    <div>
+                        <label for="drop-select" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Destination / Drop Location</label>
+                        <select id="drop-select" required disabled class="w-full bg-slate-950/40 border border-slate-800 text-slate-500 px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
+                            <option value="" disabled selected>Select pickup first</option>
+                        </select>
+                    </div>
+
+                    <!-- Date & Time Row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="pickup-date" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Pickup Date</label>
+                            <input type="date" id="pickup-date" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                        </div>
+                        <div>
+                            <label for="pickup-time" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Pickup Time</label>
+                            <select id="pickup-time" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
+                                <option value="" disabled selected>Select Pickup Time</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Ride Category Select -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Ride Category</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <label class="category-radio flex items-center justify-between p-4 bg-slate-950/60 border border-slate-800 rounded-2xl cursor-pointer hover:border-slate-700 transition-all duration-300">
+                                <span class="text-sm font-semibold text-slate-300">Local (Kolkata)</span>
+                                <input type="radio" name="ride-category" value="local" checked class="accent-amber-500 w-4 h-4">
+                            </label>
+                            <label class="category-radio flex items-center justify-between p-4 bg-slate-950/60 border border-slate-800 rounded-2xl cursor-pointer hover:border-slate-700 transition-all duration-300">
+                                <span class="text-sm font-semibold text-slate-300">Intercity</span>
+                                <input type="radio" name="ride-category" value="intercity" class="accent-amber-500 w-4 h-4">
+                            </label>
+                            <label class="category-radio flex items-center justify-between p-4 bg-slate-950/60 border border-slate-800 rounded-2xl cursor-pointer hover:border-slate-700 transition-all duration-300">
+                                <span class="text-sm font-semibold text-slate-300">Outstation</span>
+                                <input type="radio" name="ride-category" value="outstation" class="accent-amber-500 w-4 h-4">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Outstation Days Selector (Initially Hidden) -->
+                    <div id="outstation-days-container" class="hidden">
+                        <label for="outstation-days" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Number of Days (Outstation)</label>
+                        <input type="number" id="outstation-days" min="1" max="30" value="1" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                        <p class="text-xs text-slate-500 mt-1">Driver night halt allowance is calculated based on days.</p>
+                    </div>
+
+                    <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-amber-500/20 font-semibold tracking-wide">
+                        Check Availability & Rates
+                    </button>
+                </form>
+            </section>
+
+            <!-- STEP 2 PANEL: FLEET & AVAILABILITY MATRIX -->
+            <section id="panel-step-2" class="hidden space-y-6">
+                <div class="border-b border-slate-800 pb-4 mb-4 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-amber-500">Select Vehicle Class</h2>
+                        <p class="text-slate-400 text-xs mt-1">Choose a vehicle category with computed flat fare structures.</p>
+                    </div>
+                    <div class="text-right">
+                        <span id="route-km-badge" class="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-xl font-bold text-xs">Estimated: -- km</span>
+                    </div>
+                </div>
+
+                <!-- Active Car Grid -->
+                <div id="fleet-list-container" class="space-y-4">
+                    <!-- Sedan Card -->
+                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="sedan">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-500">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-white">Sedan</h3>
+                                <p class="text-slate-400 text-xs mt-0.5">Dzire, Etios • Up to 4 passengers • 2 bags</p>
+                            </div>
+                        </div>
+                        <div class="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center">
+                            <span class="text-slate-400 text-xs sm:mb-1">Estimated Fare</span>
+                            <span class="car-fare-display text-2xl font-black text-amber-500">₹----</span>
+                        </div>
+                        <div class="sold-out-overlay absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 hidden flex items-center justify-center">
+                            <span class="bg-rose-500/20 border border-rose-500/40 text-rose-400 font-extrabold text-sm py-2 px-5 rounded-2xl tracking-widest uppercase">Sold Out</span>
+                        </div>
+                    </div>
+
+                    <!-- SUV Card -->
+                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="suv">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-500">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-white">SUV</h3>
+                                <p class="text-slate-400 text-xs mt-0.5">Ertiga, Triber • Up to 6 passengers • 3 bags</p>
+                            </div>
+                        </div>
+                        <div class="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center">
+                            <span class="text-slate-400 text-xs sm:mb-1">Estimated Fare</span>
+                            <span class="car-fare-display text-2xl font-black text-amber-500">₹----</span>
+                        </div>
+                        <div class="sold-out-overlay absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 hidden flex items-center justify-center">
+                            <span class="bg-rose-500/20 border border-rose-500/40 text-rose-400 font-extrabold text-sm py-2 px-5 rounded-2xl tracking-widest uppercase">Sold Out</span>
+                        </div>
+                    </div>
+
+                    <!-- MUV Card -->
+                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="muv">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-500">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-white">Group MUV</h3>
+                                <p class="text-slate-400 text-xs mt-0.5">Innova, Marazzo • Up to 7 passengers • 4 bags</p>
+                            </div>
+                        </div>
+                        <div class="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center">
+                            <span class="text-slate-400 text-xs sm:mb-1">Estimated Fare</span>
+                            <span class="car-fare-display text-2xl font-black text-amber-500">₹----</span>
+                        </div>
+                        <div class="sold-out-overlay absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 hidden flex items-center justify-center">
+                            <span class="bg-rose-500/20 border border-rose-500/40 text-rose-400 font-extrabold text-sm py-2 px-5 rounded-2xl tracking-widest uppercase">Sold Out</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="grid grid-cols-3 gap-4 pt-4">
+                    <button type="button" id="btn-back-to-1" class="col-span-1 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 text-slate-300 font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                        Back
+                    </button>
+                    <button type="button" id="btn-submit-step-2" disabled class="col-span-2 bg-amber-500 disabled:bg-slate-800 text-slate-950 disabled:text-slate-500 font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-amber-500/10 text-sm">
+                        Review Booking
+                    </button>
+                </div>
+            </section>
+
+            <!-- STEP 3 PANEL: SUMMARY & DUAL DISPATCH -->
+            <section id="panel-step-3" class="hidden space-y-6">
+                <div class="border-b border-slate-800 pb-4 mb-6">
+                    <h2 class="text-3xl font-extrabold text-amber-500">Review Your Booking</h2>
+                    <p class="text-slate-400 text-xs mt-1">Please confirm all trip parameters before sending.</p>
+                </div>
+
+                <!-- Bill breakdown -->
+                <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+                    <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
+                        <span class="text-slate-400 font-semibold">Pickup Node</span>
+                        <span id="summary-pickup" class="font-bold text-white">Howrah Station</span>
+                    </div>
+                    <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
+                        <span class="text-slate-400 font-semibold">Drop Destination</span>
+                        <span id="summary-drop" class="font-bold text-white">Airport</span>
+                    </div>
+                    <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
+                        <span class="text-slate-400 font-semibold">Pickup Time</span>
+                        <span id="summary-datetime" class="font-bold text-white">--/--/---- --:--</span>
+                    </div>
+                    <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
+                        <span class="text-slate-400 font-semibold">Ride Category</span>
+                        <span id="summary-category" class="font-bold text-white">Local</span>
+                    </div>
+                    <div id="summary-days-row" class="flex justify-between text-sm py-1 border-b border-slate-800/40 hidden">
+                        <span class="text-slate-400 font-semibold">Outstation Duration</span>
+                        <span id="summary-days" class="font-bold text-white">1 Day</span>
+                    </div>
+                    <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
+                        <span class="text-slate-400 font-semibold">Vehicle Class</span>
+                        <span id="summary-tier" class="font-bold text-white">Sedan</span>
+                    </div>
+                    
+                    <!-- Grand Total -->
+                    <div class="flex justify-between items-center pt-4 border-t border-slate-800">
+                        <span class="text-base text-slate-300 font-bold">Estimated Grand Total</span>
+                        <span id="summary-grand-total" class="text-3xl font-black text-amber-500">₹----</span>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-500 text-center leading-relaxed px-4">
+                    Confirming will log the entry into the Firestore database. A booking approval notification and invoice details will be dispatched to your account.
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="grid grid-cols-3 gap-4 pt-4">
+                    <button type="button" id="btn-back-to-2" class="col-span-1 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 text-slate-300 font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                        Back
+                    </button>
+                    <button type="button" id="btn-confirm-booking" class="col-span-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.01 2.01c-5.52 0-10 4.48-10 10 0 1.76.46 3.41 1.26 4.86l-1.26 4.6 4.73-1.24c1.4.76 3 1.18 4.72 1.18 5.52 0 10-4.48 10-10s-4.48-10-10-10zm0 18c-1.5 0-2.97-.39-4.27-1.12l-.3-.17-2.8.73.75-2.73-.19-.3A7.957 7.957 0 014.01 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z"/>
+                        </svg>
+                        <span>Confirm & Book</span>
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-6 border-t border-slate-800/80 bg-slate-900/40 text-center relative z-10 text-xs text-slate-500">
+        <p>© 2026 IshanCabs. All rights reserved. Premium ride solutions for Kolkata & Howrah.</p>
+    </footer>
+
+    <!-- Scripts Module Loader -->
+    <script type="module" src="bookingUI.js"></script>
+</body>
+</html>
