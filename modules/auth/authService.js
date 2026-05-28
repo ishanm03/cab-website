@@ -3,7 +3,7 @@
 import { auth } from "../shared/firebase.js";
 import { 
     GoogleAuthProvider, 
-    signInWithRedirect, 
+    signInWithPopup, 
     RecaptchaVerifier, 
     signInWithPhoneNumber,
     signOut 
@@ -22,7 +22,7 @@ const authService = {
 
     /**
      * Triggers Google Authentication
-     * Handles browser redirects, and provides clear hook points for Capacitor native API
+     * Handles browser popups natively, and provides clear hook points for Capacitor native API
      */
     async loginWithGoogle() {
         if (!auth) throw new Error("Firebase Auth is not initialized.");
@@ -36,8 +36,8 @@ const authService = {
 
         try {
             const provider = new GoogleAuthProvider();
-            // Swapped popup for redirect to eliminate browser blockages
-            await signInWithRedirect(auth, provider);
+            const result = await signInWithPopup(auth, provider);
+            return result.user;
         } catch (error) {
             console.error("IshanCabs: Google Login Error:", error);
             throw error;
