@@ -1,6 +1,6 @@
 # 🚖 IshanCabs: Project Analysis & Modular Feature Plan (with APK Compatibility)
 
-This document provides a detailed analysis of your existing repository files, evaluates the design choices, and presents a modular, highly scalable folder architecture for the completed **Customer Auth (Sign Up & Login) Module** and future enhancements (e.g., Bookings). It addresses hosting on **GitHub Pages** for a Proof of Concept (PoC) and wrapping into an **Android APK (Play Store)**, leveraging a 100% **Free-Tier/Cost-Effective** infrastructure tailored for India (INR).
+This document provides a detailed analysis of your existing repository files, evaluates the design choices, and presents a modular, highly scalable folder architecture for the completed **Customer Auth (Sign Up & Login) Module** and the upcoming **Booking Module** of your cab service. It addresses hosting on **GitHub Pages** for a Proof of Concept (PoC) and wrapping into an **Android APK (Play Store)**, leveraging a 100% **Free-Tier/Cost-Effective** infrastructure tailored for India (INR).
 
 ---
 
@@ -82,57 +82,59 @@ cab-website/
     │   ├── authUI.js          # Handles interactive elements (tabs, forms, alerts)
     │   └── authService.js     # Communicates with Firebase Auth (supports Web & Native APK bridging)
     │
-    ├── booking/               # Future Booking Module (Scalable plug-and-play)
-    │   ├── booking.html       # Booking flow screen
-    │   ├── booking.css        # Booking specific layout
-    │   ├── bookingUI.js       # Handles booking inputs & fare calculations
-    │   └── bookingService.js  # Connects to Firebase Firestore for booking CRUD
+    ├── booking/               # Customer Booking Module
+    │   ├── booking.html       # Booking flow screen (Multi-step glassmorphic UI)
+    │   ├── booking.css        # Booking specific layout, overlays, and indicators
+    │   ├── bookingUI.js       # Coordinates steps, date validations, and pricing calculations
+    │   └── bookingService.js  # Connects to Firestore & WhatsApp, checks overlapping inventory
     │
     └── shared/                # Universal Shared Modules & Integrations
         ├── firebase.js        # Core Firebase Config & SDK Initialization (Firestore/Auth)
         ├── dbService.js       # Common Firestore operations (user profiles, audit columns)
+        ├── routesMatrix.js    # Decoupled matrix containing popular routes, km, and flat pricing
         └── utils.js           # Utility helpers (time formatting, input sanitization)
 ```
 
 ---
 
-## 5. Completed Auth Module Enhancements
+## 5. Booking Module Specifications
 
-### A. Dynamic Login / Logout Header button (`app.js`)
-Rather than keeping a static hardcoded button on the landing page, `app.js` is loaded as an ES Module and acts as a dynamic state coordinator:
-- **State Check**: Listens to Firebase’s `onAuthStateChanged`.
-- **Logged-Out State**: Renders **"Rider Login / Sign Up"** with the default amber user profile icon. Clicking navigates normally to `./modules/auth/auth.html`.
-- **Logged-In State**: Renders **"Logout"** with a rose-red sign-out icon. Hovering transitions the border to a warning color (`hover:border-rose-500`). 
-- **Logout intercept**: Intercepts the click, prompts a confirmation dialog (`"Are you sure you want to log out?"`), signs the user out cleanly, and updates the UI instantly without needing a full page refresh.
+### A. Real-Time Overbooking Prevention
+We implement a **Time-Aware Inventory Control** check in the booking service:
+- **`vehicles` Collection**: Stored in Firestore, it lists physical fleet cars, vehicle categories, and active statuses.
+- **Overlapping Query**: When the rider queries a date and time, the booking service fetches overlapping confirmed bookings for that tier. If the count of occupied cars matches your total active fleet, the system automatically marks that tier as **"Sold Out"** and disables selection, avoiding double-bookings.
 
-### B. Interactive Close Button (`auth.html`)
-To prevent riders from getting stuck on the login screen, we implemented a standard exit route:
-- **Design**: An absolute positioned cross button (`x`) inside the main glassmorphic login card.
-- **Styling**: Blends with the playful-modern glassmorphic theme. It transitions smoothly to white on hover with a semi-transparent dark backdrop (`hover:bg-slate-800/60 hover:text-white`).
-- **Touch-Optimized**: Scales down slightly (`active:scale-95`) when pressed.
-- **WebView-Safe**: Employs a strict relative route (`../../index.html`) to guarantee path resolution inside Capacitor.
+### B. Dynamic Driver & Vehicle Assignment Mapping
+To give you complete, flexible control over the fleet, we separate vehicles and drivers into distinct entities:
+- **`drivers` Collection**: Stores names, contact numbers, and status (e.g., `active`, `sick`, `on_leave`).
+- **`vehicles` Collection**: Stores car tiers and plate numbers, mapping dynamically to drivers via an `assigned_driver_id` pointer.
+- **Dynamic Swapping**: If a driver falls sick or takes a day off, you can quickly edit the vehicle's `assigned_driver_id` reference or change the driver's status inside the future Admin Dashboard.
+- **Historical Auditing**: When you confirm a booking, the active driver's details and vehicle plate number are written directly inside that booking document as a snapshot. This preserves record accuracy even if the driver is assigned to a different car next month.
+
+### C. Route Configuration (`routesMatrix.js`)
+Distances and prices are stored in a central config module. It defines distances (km) and base rates in INR, which prepares your codebase to expand into an Admin Dashboard seamlessly:
+```javascript
+export const routesMatrix = {
+    "Howrah Station": {
+        "Airport": { km: 18, base_fare_sedan: 999, base_fare_suv: 1499 },
+        "Digha": { km: 185, base_fare_sedan: 4500, base_fare_suv: 6500 }
+    }
+};
+```
+
+### D. 2-Hour Scheduling Enforcer
+All booking date/time fields validate client inputs in real-time, blocking requests unless they are scheduled at least **2 hours in advance** from the present time.
+
+### E. WhatsApp & Firestore Dual Dispatch
+On checking out:
+1. The trip record is saved in Cloud Firestore, creating an audit-ready `booking_id` linked to the customer's profile.
+2. The user is redirected to a pre-filled WhatsApp API window, sending the exact booking payload directly to your customer support chat automatically.
 
 ---
 
 ## 6. Cost-Effective Integration Architecture (Free Tier & INR Target)
 
 To respect your goal of staying within the **Free Tier** or at a modest cost, we structured the entire backend using **Firebase Spark (Free Tier)**.
-
-```mermaid
-graph TD
-    UI[Client Browser UI / APK WebView] <-->|Authentication Bridge| FBAuth[Firebase Authentication]
-    UI <-->|Write User Profile| FSDb[(Cloud Firestore Database)]
-    
-    subgraph Firebase Free Tier Spark Plan
-        FBAuth
-        FSDb
-    end
-    
-    subgraph Authentication Channels
-        G[Google Sign-In] -->|100% Free| FBAuth
-        P[Phone OTP SMS] -->|10,000 Free SMS/mo| FBAuth
-    end
-```
 
 ### 💳 Service Cost Matrix (INR)
 
@@ -147,52 +149,75 @@ graph TD
 
 ---
 
-## 7. Firebase Customer Profiles & Audit Columns
+## 7. Firebase Data Models
 
-When a customer registers, their profile is initialized inside a Firestore collection named `users` keyed by their Firebase Auth unique ID (`uid`). This guarantees security rules can easily isolate user access.
-
-### 🗄️ Firestore User Data Model
-
+### A. User Profile Schema (`users` Collection)
 ```json
 {
   "uid": "google_or_phone_unique_firebase_uid",
   "name": "Ishan Mukherjee",
   "city": "Kolkata",
   "phone": "+918981538038",
-  "email": "ishan@example.com", // Nullable if signing up via Phone OTP
-  "auth_provider": "google.com", // "google.com" or "phone"
-  "status": "active", // "active", "suspended", "pending"
-  "creation_ts": "server_timestamp", // Audit Column
-  "updated_ts": "server_timestamp" // Audit Column
+  "email": "ishan@example.com",
+  "auth_provider": "google.com",
+  "status": "active",
+  "creation_ts": "server_timestamp",
+  "updated_ts": "server_timestamp"
 }
 ```
 
-### 🛡️ Why Use Server Timestamps?
-Using client-side Javascript `new Date()` is unreliable and insecure, as users can tamper with their system clocks. We will use:
-- **`firebase.firestore.FieldValue.serverTimestamp()`** during writes, which ensures that Firestore logs the exact timezone-accurate time on the server side.
+### B. Driver Profile Schema (`drivers` Collection)
+```json
+{
+  "driver_id": "DRV_20260528_xxxx",
+  "name": "Rajesh Kumar",
+  "phone": "+919876543210",
+  "status": "active", // "active" | "sick" | "on_leave" | "suspended"
+  "creation_ts": "server_timestamp"
+}
+```
 
----
+### C. Vehicle Profile Schema (`vehicles` Collection)
+```json
+{
+  "vehicle_id": "WB-02-A-1234",
+  "tier": "sedan",
+  "model": "Swift Dzire",
+  "status": "active",
+  "assigned_driver_id": "DRV_20260528_xxxx",
+  "creation_ts": "server_timestamp"
+}
+```
 
-## 8. Implementation Action Plan
-
-1. **Step 1: Firebase Project Setup**
-   - Initialize a Firebase account, create a new project, and configure authentication (enable Google Login and Phone Auth).
-   - Configure Firestore Database in Test Mode.
-2. **Step 2: Create Modular Folders**
-   - Create directories under `modules/` (`auth`, `shared`).
-   - Setup `modules/shared/firebase.js` to establish connection.
-   - **Crucial Rule**: Build using strictly **relative file linking** to guarantee out-of-the-box WebView compile readiness.
-3. **Step 3: Build the SignUp/Login UI**
-   - Develop `auth.html` & `auth.css` mirroring the playful modern theme, utilizing glassmorphism and subtle transitions.
-   - Implement dynamic view transitions (sliding between Google Sign-In and Phone OTP fields).
-4. **Step 4: Integrate Firebase Client Operations & Bridge Layer**
-   - Implement native platform detection:
-     ```javascript
-     const isNative = window.Capacitor !== undefined;
-     ```
-   - Connect the login screen triggers to the Google/OTP authentication handlers using a decoupled service layer.
-   - Insert database writing commands to populate user information upon successful signup.
-5. **Step 5: Verify, Deploy, & Prepare APK**
-   - Perform local verification of the signup loop.
-   - Deploy web version to GitHub Pages.
-   - Wrap the project using Capacitor CLI (`npx cap init` and `npx cap add android`) to establish the Android build pipeline.
+### D. Trip Booking Schema (`bookings` Collection)
+```json
+{
+  "booking_id": "BK_20260528_xxxx",
+  "customer_id": "google_or_phone_unique_firebase_uid",
+  "customer_details": {
+    "name": "Ishan Mukherjee",
+    "phone": "+918981538038"
+  },
+  "trip_details": {
+    "ride_type": "outstation",
+    "pickup_location": "Howrah Station",
+    "drop_location": "Digha",
+    "pickup_datetime": "2026-06-01T12:00:00.000Z",
+    "outstation_days": 3
+  },
+  "fare_details": {
+    "vehicle_tier": "sedan",
+    "estimated_km": 185.0,
+    "estimated_fare": 2520.00
+  },
+  "status": "pending_approval",
+  "payment_status": "pending",
+  "driver_assignment": { // Snapshot of assignment locked upon confirmation
+    "driver_name": "Rajesh Kumar",
+    "driver_phone": "+919876543210",
+    "vehicle_number": "WB-02-A-1234"
+  },
+  "creation_ts": "server_timestamp",
+  "updated_ts": "server_timestamp"
+}
+```
