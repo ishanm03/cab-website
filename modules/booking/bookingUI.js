@@ -482,21 +482,15 @@ async function handleFinalConfirm() {
         const bookingId = await bookingService.createBooking(bookingPayload);
         bookingPayload.booking_id = bookingId;
 
-        // 2. Compile pre-filled WhatsApp API trigger
-        const redirectUrl = bookingService.compileWhatsAppLink(bookingPayload);
-
         // Success Alert and redirection
         utils.hideElement(bookingLoader);
         utils.showElement(panelStep3);
-        utils.showAlert(bookingAlert, "Booking successful! Redirecting to WhatsApp...", "success");
+        utils.showAlert(bookingAlert, "Booking successful! Your ride has been registered and is pending approval.", "success");
 
-        // 3. Open WhatsApp trigger in a new browser tab
-        window.open(redirectUrl, "_blank");
-
-        // 4. Smoothly route rider back to primary homepage landing
+        // Smoothly route rider back to primary homepage landing
         setTimeout(() => {
             window.location.href = "../../index.html";
-        }, 1800);
+        }, 3000);
     } catch (error) {
         hideLoader(panelStep3);
         utils.showAlert(bookingAlert, "Booking transaction failed: " + error.message);
