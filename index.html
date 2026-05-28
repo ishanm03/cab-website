@@ -41,14 +41,10 @@
             class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center w-full">
 
             <!-- Left Column: Content -->
-            <div class="space-y-8">
-                <!-- Brand Label -->
-                <div class="brand-label">
-                    <svg class="brand-icon" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z" />
-                    </svg>
-                    <span class="brand-text">IshanCabs</span>
+            <div class="space-y-8 flex-grow">
+                <!-- Brand Title -->
+                <div class="text-7xl sm:text-8xl lg:text-[6.75rem] font-black text-yellow-400 tracking-tight leading-none uppercase">
+                    Ishan Cabs
                 </div>
 
                 <div>
@@ -60,35 +56,35 @@
                     </p>
                 </div>
 
-                <!-- Call Button -->
-                <a href="tel:+918981538038" class="call-button">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.27c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.27 1.02l-2.18 2.2z" />
-                    </svg>
-                    <span>Call Us</span>
-                </a>
+                <!-- Unified Button Grid (Side-by-side on desktop, stacked on mobile) -->
+                <div class="flex flex-col sm:flex-row gap-4 w-full pt-4">
+                    <!-- Call Button -->
+                    <a href="tel:+918981538038" class="flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-950 font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg w-full sm:flex-1 border-2 border-slate-950">
+                        <svg class="w-6 h-6 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.27c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.27 1.02l-2.18 2.2z" />
+                        </svg>
+                        <span>Call Us</span>
+                    </a>
 
-                <!-- WhatsApp Booking Button -->
-                <a href="https://wa.me/918981538038?text=Hi%21%20I%20would%20like%20to%20enquire%20about%20a%20cab.%20Please%20share%20the%20details."
-                    target="_blank"
-                    class="inline-flex items-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-8 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg pulse-button mb-2">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.01 1.01 4.31L2.5 22l6.26-1.5c1.26.64 2.68 1 4.24 1 5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.41 0-2.78-.33-3.98-.93l-1.45.35.35-1.45C4.33 14.78 4 13.41 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z" />
-                    </svg>
-                    <span>WhatsApp Us</span>
-                </a>
+                    <!-- WhatsApp Booking Button -->
+                    <a href="https://wa.me/918981538038?text=Hi%21%20I%20would%20like%20to%20enquire%20about%20a%20cab.%20Please%20share%20the%20details."
+                        target="_blank"
+                        class="flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg pulse-button w-full sm:flex-1">
+                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.01 1.01 4.31L2.5 22l6.26-1.5c1.26.64 2.68 1 4.24 1 5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.41 0-2.78-.33-3.98-.93l-1.45.35.35-1.45C4.33 14.78 4 13.41 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z" />
+                        </svg>
+                        <span>WhatsApp Us</span>
+                    </a>
 
-                <!-- Book Cab Button (Visible all the time) -->
-                <a href="./modules/booking/booking.html" id="hero-book-btn" style="color: #0F172A !important;"
-                    class="inline-flex items-center gap-3 bg-amber-500 hover:bg-amber-600 font-extrabold py-4 px-8 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-amber-500/20 mb-2">
-                    <svg class="w-6 h-6" style="color: #0F172A !important;" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z" />
-                    </svg>
-                    <span style="color: #0F172A !important;" class="font-extrabold">Book Cab</span>
-                </a>
+                    <!-- Book Cab Button -->
+                    <a href="./modules/booking/booking.html" id="hero-book-btn"
+                        class="flex items-center justify-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-amber-500/20 w-full sm:flex-1">
+                        <svg class="w-6 h-6 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z" />
+                        </svg>
+                        <span>Book Cab</span>
+                    </a>
+                </div>
             </div>
 
             <!-- Right Column: Cab Image -->
