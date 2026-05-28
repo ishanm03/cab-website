@@ -88,8 +88,9 @@ function initBookingUI() {
     // 2. Logout trigger
     btnRiderLogout.addEventListener("click", handleLogout);
 
-    // 3. Hydrate routes dropdowns
+    // 3. Hydrate routes and time dropdowns
     hydratePickupLocations();
+    populateTimeDropdown();
 
     // 4. Change pickups and populate drop options
     pickupSelect.addEventListener("change", handlePickupChange);
@@ -99,8 +100,9 @@ function initBookingUI() {
         radio.addEventListener("change", handleCategoryChange);
     });
 
-    // 6. Set calendar date restrictions (Lead Time Constraints)
+    // 6. Set calendar date restrictions (Lead Time Constraints) and trigger overlay on focus/click
     restrictDateInputs();
+    setupDatepickerTrigger();
 
     // 7. Form Step 1 Submission
     formStep1.addEventListener("submit", handleStep1Submit);
@@ -207,6 +209,46 @@ function restrictDateInputs() {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     pickupDate.min = `${yyyy}-${mm}-${dd}`;
+}
+
+// Populate the pickup time select dropdown with 30-minute intervals
+function populateTimeDropdown() {
+    if (!pickupTime) return;
+    pickupTime.innerHTML = `<option value="" disabled selected>Select Pickup Time</option>`;
+    
+    for (let hour = 0; hour < 24; hour++) {
+        for (let min of [0, 30]) {
+            const h24 = String(hour).padStart(2, '0');
+            const m = String(min).padStart(2, '0');
+            const timeVal = `${h24}:${m}`;
+            
+            // Format 12-hour display string
+            const period = hour >= 12 ? "PM" : "AM";
+            const h12 = hour % 12 === 0 ? 12 : hour % 12;
+            const displayTime = `${h12}:${m} ${period}`;
+            
+            const opt = document.createElement("option");
+            opt.value = timeVal;
+            opt.textContent = displayTime;
+            pickupTime.appendChild(opt);
+        }
+    }
+}
+
+// Binds native calendar overlay trigger on input click & focus for extreme reliability
+function setupDatepickerTrigger() {
+    if (!pickupDate) return;
+    
+    const triggerPicker = () => {
+        try {
+            pickupDate.showPicker();
+        } catch (e) {
+            console.warn("showPicker not supported on this browser:", e);
+        }
+    };
+    
+    pickupDate.addEventListener("click", triggerPicker);
+    pickupDate.addEventListener("focus", triggerPicker);
 }
 
 // Global loader controllers
