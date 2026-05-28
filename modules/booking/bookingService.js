@@ -127,10 +127,10 @@ const bookingService = {
     },
 
     /**
-     * Commits a customer's booking request directly to the Cloud Firestore database
-     * @param {object} bookingPayload - Comprehensive booking data matching trip schemas
-     * @returns {Promise<string>} Generated Booking ID
-     */
+      * Commits a customer's booking request directly to the Cloud Firestore database
+      * @param {object} bookingPayload - Comprehensive booking data matching trip schemas
+      * @returns {Promise<string>} Generated Booking ID
+      */
     async createBooking(bookingPayload) {
         if (!db) throw new Error("Firestore not initialized.");
 
@@ -140,15 +140,37 @@ const bookingService = {
             const randomHex = Math.floor(1000 + Math.random() * 9000).toString();
             const bookingId = `BK-${dateStamp}-${randomHex}`;
 
+            // Simple static dummy assignments matching the selected tier (JSON dictionary)
+            const dummyFleet = {
+                sedan: {
+                    driver_name: "Rajesh Kumar",
+                    driver_phone: "+918981538038",
+                    vehicle_number: "WB-02-A-1111"
+                },
+                suv: {
+                    driver_name: "Subhasis Roy",
+                    driver_phone: "+919876543215",
+                    vehicle_number: "WB-02-B-6666"
+                },
+                muv: {
+                    driver_name: "Deepak Patel",
+                    driver_phone: "+919876543212",
+                    vehicle_number: "WB-02-C-9999"
+                }
+            };
+
+            const tier = bookingPayload.fare_details.vehicle_tier;
+            const assignment = dummyFleet[tier] || dummyFleet.sedan;
+
             const completePayload = {
                 ...bookingPayload,
                 booking_id: bookingId,
                 status: "pending_approval",
                 payment_status: "pending",
                 driver_assignment: {
-                    driver_name: null,
-                    driver_phone: null,
-                    vehicle_number: null
+                    driver_name: assignment.driver_name,
+                    driver_phone: assignment.driver_phone,
+                    vehicle_number: assignment.vehicle_number
                 },
                 creation_ts: serverTimestamp(),
                 updated_ts: serverTimestamp()
