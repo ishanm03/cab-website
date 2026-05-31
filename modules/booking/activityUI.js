@@ -76,8 +76,7 @@ function startActivitySnapshotListener() {
     try {
         const activityQuery = query(
             collection(db, "bookings"),
-            where("customer_id", "==", currentUser.uid),
-            orderBy("creation_ts", "desc")
+            where("customer_id", "==", currentUser.uid)
         );
 
         firestoreUnsubscribe = onSnapshot(activityQuery, (snapshot) => {
@@ -87,6 +86,13 @@ function startActivitySnapshotListener() {
                     id: doc.id,
                     ...doc.data()
                 });
+            });
+
+            // Perform in-memory descending sort based on creation_ts to bypass composite index requirements
+            activityBookings.sort((a, b) => {
+                const timeA = a.creation_ts ? (a.creation_ts.seconds || 0) : 0;
+                const timeB = b.creation_ts ? (b.creation_ts.seconds || 0) : 0;
+                return timeB - timeA; // Descending
             });
 
             utils.hideElement(activityLoader);
