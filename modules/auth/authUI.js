@@ -33,9 +33,18 @@ const authMethodsPanel = document.getElementById("auth-methods-panel");
 const authTitle = document.getElementById("auth-title");
 const authSubtitle = document.getElementById("auth-subtitle");
 
+// Admin Portal Element Handles
+const panelAdmin = document.getElementById("panel-admin");
+const adminLoginForm = document.getElementById("admin-login-form");
+const adminEmail = document.getElementById("admin-email");
+const adminPassword = document.getElementById("admin-password");
+const btnToggleAdmin = document.getElementById("btn-toggle-admin");
+
 // State Variables
 let currentUser = null;
 let recaptchaVerifier = null;
+let isAdminMode = false;
+let activeRiderTab = "google"; // "google" | "phone"
 
 // Initialize Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
@@ -45,9 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
 function initUI() {
     // 1. Tab Navigation Toggles
     tabGoogle.addEventListener("click", () => {
+        activeRiderTab = "google";
         toggleTabs("google");
     });
     tabPhone.addEventListener("click", () => {
+        activeRiderTab = "phone";
         toggleTabs("phone");
     });
 
@@ -70,7 +81,25 @@ function initUI() {
     // 6. Complete Profile Submission
     profileCompletionForm.addEventListener("submit", handleProfileCompletionSubmit);
 
-    // 7. Track User Authentication State Change
+    // 7. Admin Mode Toggle
+    btnToggleAdmin.addEventListener("click", toggleAdminMode);
+
+    // 8. Admin Login Action
+    adminLoginForm.addEventListener("submit", handleAdminLogin);
+
+    // 9. Check if active admin session exists
+    if (localStorage.getItem("admin_poc_session") === "true") {
+        handleAuthStateChange({
+            uid: "admin_poc_uid",
+            email: "admin@ishancabs.com",
+            displayName: "Admin Manager",
+            phoneNumber: "+919999999999",
+            providerData: [{ providerId: "password" }]
+        });
+        return;
+    }
+
+    // 10. Track User Authentication State Change
     if (firebaseAuth) {
         onAuthStateChanged(firebaseAuth, handleAuthStateChange);
     }
@@ -79,6 +108,7 @@ function initUI() {
 // Switches visually between Auth Method Tabs
 function toggleTabs(activeTab) {
     utils.hideElement(authAlert);
+    const tabsContainer = tabGoogle.parentElement;
     if (activeTab === "google") {
         tabGoogle.className = "flex-1 py-3 text-sm font-semibold rounded-xl text-amber-500 bg-slate-900 transition-all duration-300";
         tabPhone.className = "flex-1 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300";
@@ -89,6 +119,52 @@ function toggleTabs(activeTab) {
         tabGoogle.className = "flex-1 py-3 text-sm font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300";
         utils.showElement(panelPhone);
         utils.hideElement(panelGoogle);
+    }
+}
+
+// Toggles layout between standard Rider login and Staff Admin email/password login
+function toggleAdminMode() {
+    utils.hideElement(authAlert);
+    isAdminMode = !isAdminMode;
+    const tabsContainer = tabGoogle.parentElement;
+
+    if (isAdminMode) {
+        // Switch to Admin Login Screen
+        utils.hideElement(tabsContainer);
+        utils.hideElement(panelGoogle);
+        utils.hideElement(panelPhone);
+        utils.showElement(panelAdmin);
+        
+        authTitle.textContent = "Admin Dashboard";
+        authSubtitle.textContent = "Log in to manage bookings & fleet";
+        btnToggleAdmin.textContent = "Return to Rider Sign-In";
+    } else {
+        // Switch back to Rider Login Screen
+        utils.showElement(tabsContainer);
+        utils.showElement(otpVerificationForm.classList.contains("hidden") ? phoneNumberForm : otpVerificationForm);
+        utils.hideElement(panelAdmin);
+        toggleTabs(activeRiderTab);
+        
+        authTitle.textContent = "Welcome Rider";
+        authSubtitle.textContent = "Verify your identity to book premium rides";
+        btnToggleAdmin.textContent = "Staff / Administrator Sign-In";
+    }
+}
+
+// Admin Login form transmitter
+async function handleAdminLogin(e) {
+    e.preventDefault();
+    const email = adminEmail.value.trim();
+    const password = adminPassword.value.trim();
+
+    showLoader("Authenticating administrator credentials...");
+    try {
+        const user = await authService.loginWithEmail(email, password);
+        // Force state trigger for admin flow
+        await handleAuthStateChange(user);
+    } catch (error) {
+        hideLoader(true);
+        utils.showAlert(authAlert, error.message);
     }
 }
 
@@ -114,6 +190,26 @@ async function handleAuthStateChange(user) {
         currentUser = user;
         showLoader("Checking user profile details...");
         try {
+            // Check if the user is the Admin
+            if (user.email === "admin@ishancabs.com") {
+                const adminProfile = {
+                    uid: user.uid,
+                    name: "Admin Manager",
+                    city: "Kolkata",
+                    phone: "+919999999999",
+                    email: "admin@ishancabs.com",
+                    role: "admin",
+                    auth_provider: "password"
+                };
+                // Ensure profile exists in Firestore and is marked as admin
+                await dbService.saveUserProfile(user.uid, adminProfile);
+                utils.showAlert(authAlert, "Admin authentication successful! Redirecting...", "success");
+                setTimeout(() => {
+                    window.location.href = "../admin/admin.html";
+                }, 1200);
+                return;
+            }
+
             const profile = await dbService.getUserProfile(user.uid);
             if (profile && profile.name && profile.city && profile.phone) {
                 // User already completed profile -> redirect back

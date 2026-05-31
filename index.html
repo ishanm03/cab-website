@@ -59,7 +59,7 @@
                 <!-- Unified Button Grid (Side-by-side on desktop, stacked on mobile) -->
                 <div class="flex flex-col sm:flex-row gap-4 w-full pt-4">
                     <!-- Call Button -->
-                    <a href="tel:+918981538038" class="flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-950 font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg w-full sm:flex-1 border-2 border-slate-950">
+                    <a href="tel:+918981538038" class="flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold py-4 px-4 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg w-full sm:flex-1 border-2 border-slate-950 whitespace-nowrap text-sm">
                         <svg class="w-6 h-6 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.27c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.27 1.02l-2.18 2.2z" />
                         </svg>
@@ -69,7 +69,7 @@
                     <!-- WhatsApp Booking Button -->
                     <a href="https://wa.me/918981538038?text=Hi%21%20I%20would%20like%20to%20enquire%20about%20a%20cab.%20Please%20share%20the%20details."
                         target="_blank"
-                        class="flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg pulse-button w-full sm:flex-1">
+                        class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-4 px-4 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg pulse-button w-full sm:flex-1 whitespace-nowrap text-sm">
                         <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.01 1.01 4.31L2.5 22l6.26-1.5c1.26.64 2.68 1 4.24 1 5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.41 0-2.78-.33-3.98-.93l-1.45.35.35-1.45C4.33 14.78 4 13.41 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z" />
                         </svg>
@@ -78,12 +78,21 @@
 
                     <!-- Book Cab Button -->
                     <a href="./modules/booking/booking.html" id="hero-book-btn"
-                        class="flex items-center justify-center gap-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 px-6 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-amber-500/20 w-full sm:flex-1">
+                        class="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 px-4 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-amber-500/20 w-full sm:flex-1 whitespace-nowrap text-sm">
                         <svg class="w-6 h-6 text-slate-950" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z" />
                         </svg>
                         <span>Book Cab</span>
                     </a>
+
+                    <!-- Activity Button (Visible only to logged-in riders) -->
+                    <button type="button" id="btn-rider-activity"
+                        class="hidden flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-white font-extrabold py-4 px-4 rounded-3xl transition-all duration-300 transform hover:scale-105 shadow-lg w-full sm:flex-1 whitespace-nowrap text-sm">
+                        <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <span>Activity</span>
+                    </button>
                 </div>
             </div>
 
@@ -577,8 +586,53 @@
         </div>
     </section>
 
-    <!-- Script -->
+    <!-- ============================================ -->
+    <!-- OVERLAY MODAL: RIDER ACTIVITY HISTORY & FEEDBACK -->
+    <!-- ============================================ -->
+    <div id="activity-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm hidden">
+        <div class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[85vh] flex flex-col">
+            
+            <!-- Close Trigger -->
+            <button type="button" id="btn-close-activity" class="absolute top-6 right-6 text-slate-500 hover:text-white hover:bg-slate-800/60 p-2 rounded-xl transition-all duration-300 transform active:scale-95 z-20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <!-- Modal Header -->
+            <div class="border-b border-slate-800 pb-4 mb-4">
+                <h2 class="text-2xl font-black text-amber-500">Your Booking Activity</h2>
+                <p class="text-slate-400 text-xs mt-1">Review active and completed ride history logs.</p>
+            </div>
+
+            <!-- Loader Indicator -->
+            <div id="activity-loader" class="flex flex-col items-center justify-center py-12 flex-grow">
+                <div class="spinner border-4 border-amber-500 border-t-transparent rounded-full w-10 h-10 animate-spin mb-4"></div>
+                <p class="text-xs text-slate-400">Loading your history records...</p>
+            </div>
+
+            <!-- Empty State Fallback -->
+            <div id="activity-empty-state" class="hidden text-center py-12 flex-grow flex flex-col items-center justify-center">
+                <div class="w-12 h-12 bg-slate-950/50 border border-slate-800 rounded-xl flex items-center justify-center mb-3 text-slate-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-white text-sm">No Bookings Logged</h3>
+                <p class="text-slate-500 text-xs mt-0.5">You have not completed any bookings yet.</p>
+            </div>
+
+            <!-- Scrollable Content List Container -->
+            <div id="activity-list-container" class="hidden flex-grow overflow-y-auto space-y-4 pr-2">
+                <!-- Activity cards injected dynamically -->
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Script modules -->
     <script type="module" src="app.js"></script>
+    <script type="module" src="modules/booking/activityUI.js"></script>
 </body>
 
 </html>
