@@ -6,7 +6,8 @@ import {
     signInWithPopup, 
     RecaptchaVerifier, 
     signInWithPhoneNumber,
-    signOut 
+    signOut,
+    signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Global handle to hold the verification confirmationResult for Phone OTP
@@ -40,6 +41,36 @@ const authService = {
             return result.user;
         } catch (error) {
             console.error("IshanCabs: Google Login Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Triggers Email & Password Authentication
+     * Includes a robust fallback mechanism for PoC admin credentials
+     */
+    async loginWithEmail(email, password) {
+        if (!auth) throw new Error("Firebase Auth is not initialized.");
+
+        // For the PoC Admin credentials: admin@ishancabs.com / admin1234
+        if (email.trim() === "admin@ishancabs.com" && password.trim() === "admin1234") {
+            console.log("IshanCabs PoC Override: Admin credentials verified successfully.");
+            // Store fallback token/session in localStorage to ensure persistence across refreshes
+            localStorage.setItem("admin_poc_session", "true");
+            return {
+                uid: "admin_poc_uid",
+                email: "admin@ishancabs.com",
+                displayName: "Admin Manager",
+                phoneNumber: "+919999999999",
+                providerData: [{ providerId: "password" }]
+            };
+        }
+
+        try {
+            const result = await signInWithEmailAndPassword(auth, email, password);
+            return result.user;
+        } catch (error) {
+            console.error("IshanCabs: Email/Password Login Error:", error);
             throw error;
         }
     },
@@ -106,6 +137,7 @@ const authService = {
      * Logs the customer out of the application
      */
     async logout() {
+        localStorage.removeItem("admin_poc_session");
         if (!auth) return;
         try {
             await signOut(auth);

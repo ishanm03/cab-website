@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - IshanCabs Control Panel</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Global & Local Custom Styles -->
+    <link rel="stylesheet" href="../../styles.css">
+    
+    <style>
+        .admin-card {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="w-full bg-slate-900/60 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="../../index.html" class="flex items-center gap-2 hover:scale-105 transition-transform duration-300">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-300 flex items-center justify-center text-white shadow-md">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM5 11l1.5-4.5h11L19 11H5z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold tracking-tight text-white">IshanCabs</span>
+                </a>
+                <span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold tracking-wider px-2 py-0.5 rounded uppercase">Control Panel</span>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-semibold text-slate-300 hidden sm:inline" id="admin-welcome">Welcome, Admin</span>
+                <button type="button" id="btn-admin-logout" class="inline-flex items-center gap-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-rose-400 font-semibold py-2 px-4 rounded-xl transition-all duration-300 transform active:scale-95 text-xs">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Glowing Background Accents -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="absolute top-20 left-1/4 w-96 h-96 rounded-full bg-amber-500/5 blur-3xl"></div>
+        <div class="absolute bottom-20 right-1/4 w-96 h-96 rounded-full bg-coral-500/5 blur-3xl"></div>
+    </div>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        
+        <!-- Metrics Summary Grid -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="admin-card p-5 rounded-2xl flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Total Bookings</span>
+                    <span class="text-3xl font-black text-white" id="stat-total">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="admin-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-amber-500">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-500 block mb-1">Requested (Pending)</span>
+                    <span class="text-3xl font-black text-amber-400" id="stat-requested">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="admin-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-emerald-500">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-500 block mb-1">On-Going (Active)</span>
+                    <span class="text-3xl font-black text-emerald-400" id="stat-ongoing">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="admin-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-slate-600">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Completed</span>
+                    <span class="text-3xl font-black text-slate-300" id="stat-completed">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Filter Tabs -->
+        <section class="mb-6 flex flex-wrap bg-slate-950 p-1.5 rounded-2xl border border-slate-800 max-w-2xl gap-1">
+            <button type="button" id="tab-all" class="flex-1 min-w-[80px] py-2.5 text-xs font-bold rounded-xl text-amber-500 bg-slate-900 transition-all duration-200">
+                All Bookings
+            </button>
+            <button type="button" id="tab-req" class="flex-1 min-w-[80px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200">
+                Requested
+            </button>
+            <button type="button" id="tab-ong" class="flex-1 min-w-[80px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200">
+                On-Going
+            </button>
+            <button type="button" id="tab-comp" class="flex-1 min-w-[80px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200">
+                Completed
+            </button>
+            <button type="button" id="tab-rej" class="flex-1 min-w-[80px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200">
+                Rejected
+            </button>
+        </section>
+
+        <!-- Error / Info Alerts -->
+        <div id="admin-alert" class="hidden mb-6"></div>
+
+        <!-- Global Loader overlay -->
+        <div id="admin-loader" class="flex flex-col items-center justify-center py-16">
+            <div class="spinner border-4 border-amber-500 border-t-transparent rounded-full w-12 h-12 animate-spin mb-4"></div>
+            <p class="text-sm text-slate-400">Streaming bookings records in real-time...</p>
+        </div>
+
+        <!-- Bookings Cards Container -->
+        <section id="bookings-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+            <!-- Dynamic cards injected here -->
+        </section>
+
+        <!-- Fallback Empty State -->
+        <section id="bookings-empty-state" class="hidden text-center py-16 admin-card rounded-3xl border border-dashed border-slate-800">
+            <div class="w-16 h-16 bg-slate-900/50 border border-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-500">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-white">No Bookings Found</h3>
+            <p class="text-slate-500 text-sm mt-1">There are no records matching the selected status filter.</p>
+        </section>
+
+    </main>
+
+    <!-- ============================================ -->
+    <!-- OVERLAYS: MODALS & FORMS -->
+    <!-- ============================================ -->
+
+    <!-- APPROVAL & DRIVER ASSIGNMENT OVERLAY MODAL -->
+    <div id="approval-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+        <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            
+            <button type="button" id="btn-close-approve" class="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors duration-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <h2 class="text-2xl font-black text-amber-500 mb-2">Accept Booking & Assign Fleet</h2>
+            <p class="text-slate-400 text-xs mb-6">Select a pre-registered driver or manually input credentials below.</p>
+
+            <form id="approval-form" class="space-y-6">
+                <!-- Stored ID Hook -->
+                <input type="hidden" id="approve-booking-id">
+
+                <!-- OPTION A: Fleet Roster Selector -->
+                <div>
+                    <label for="approve-roster-select" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Option A: Select from Drivers Roster</label>
+                    <select id="approve-roster-select" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                        <option value="" selected>-- Manual overrides below --</option>
+                    </select>
+                </div>
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">OR (Option B: Manual Input)</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <!-- OPTION B: Manual Core input fields -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="approve-driver-name" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Driver Name</label>
+                        <input type="text" id="approve-driver-name" placeholder="E.g. Rajesh Kumar" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                    </div>
+                    <div>
+                        <label for="approve-driver-phone" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Driver Phone</label>
+                        <input type="tel" id="approve-driver-phone" placeholder="E.g. +91XXXXXXXXXX" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="approve-vehicle-number" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Vehicle Plate Number</label>
+                    <input type="text" id="approve-vehicle-number" placeholder="E.g. WB-02-A-1111" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium uppercase">
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-emerald-500/20 tracking-wide">
+                    Confirm Allocation & Approve Ride
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- REJECTION INPUT OVERLAY MODAL -->
+    <div id="rejection-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            
+            <button type="button" id="btn-close-reject" class="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors duration-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <h2 class="text-2xl font-black text-rose-500 mb-2">Reject Booking Request</h2>
+            <p class="text-slate-400 text-xs mb-6">Provide a detailed explanation. This will be visible on the rider's activity screen.</p>
+
+            <form id="rejection-form" class="space-y-4">
+                <input type="hidden" id="reject-booking-id">
+
+                <div>
+                    <label for="reject-reason" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Reason for Rejection</label>
+                    <textarea id="reject-reason" placeholder="E.g. No vehicles available at selected timing node. Please reschedule." required rows="4" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium text-sm leading-relaxed"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 rounded-2xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-rose-500/20 tracking-wide">
+                    Confirm Rejection
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Core Javascript Modules Loading -->
+    <script type="module" src="adminUI.js"></script>
+</body>
+</html>
