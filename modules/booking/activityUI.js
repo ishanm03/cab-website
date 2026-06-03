@@ -3,6 +3,7 @@
 import { auth, db } from "../shared/firebase.js";
 import { utils } from "../shared/utils.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { terminalCoordinates } from "../shared/routesMatrix.js";
 import { 
     collection, 
     query, 
@@ -28,6 +29,7 @@ let currentUser = null;
 let activityBookings = [];
 let firestoreUnsubscribe = null;
 let selectedRating = 5; // Default rating for feedback forms
+let riderMaps = {}; // booking.id -> Leaflet map instance
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
@@ -62,6 +64,8 @@ function initActivityUI() {
     btnCloseActivity.addEventListener("click", () => {
         utils.hideElement(activityModal);
         stopActivitySnapshotListener();
+        // Destroy all maps
+        Object.keys(riderMaps).forEach(id => destroyRiderMap(id));
     });
 }
 
@@ -172,6 +176,9 @@ function renderActivityList() {
             <!-- Collapsible Expanded Panel (Hidden initially) -->
             <div id="details-${booking.id}" class="hidden mt-4 pt-4 border-t border-slate-800/60 space-y-4 text-xs transition-all duration-300">
                 
+                <!-- Static Route Map Preview -->
+                <div id="map-rider-${booking.id}" class="h-36 w-full rounded-xl border border-slate-800 overflow-hidden relative z-10 hidden"></div>
+
                 <!-- Journey Route Parameters -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -302,14 +309,17 @@ function bindActivityListInteractiveEvents() {
         trigger.addEventListener("click", () => {
             const bookingId = trigger.getAttribute("data-id");
             const detailPanel = document.getElementById(`details-${bookingId}`);
+            const booking = activityBookings.find(b => b.id === bookingId);
             
             if (detailPanel.classList.contains("hidden")) {
                 detailPanel.classList.remove("hidden");
                 // Subtle slide border glow
                 trigger.parentElement.classList.add("border-amber-500/30");
+                if (booking) initRiderMap(booking);
             } else {
                 detailPanel.classList.add("hidden");
                 trigger.parentElement.classList.remove("border-amber-500/30");
+                destroyRiderMap(bookingId);
             }
         });
     });
@@ -385,4 +395,104 @@ function bindActivityListInteractiveEvents() {
             }
         });
     });
+}
+
+function initRiderMap(booking) {
+    const mapId = `map-rider-${booking.id}`;
+    const mapContainer = document.getElementById(mapId);
+    if (!mapContainer) return;
+
+    // Show the container
+    utils.showElement(mapContainer);
+
+    // If map already exists, return
+    if (riderMaps[booking.id]) {
+        setTimeout(() => {
+            if (riderMaps[booking.id]) {
+                riderMaps[booking.id].invalidateSize();
+            }
+        }, 100);
+        return;
+    }
+
+    // Retrieve coordinates from booking document
+    let pickupCoords = booking.trip_details.pickup_coords;
+    let dropCoords = booking.trip_details.drop_coords;
+    let polyline = booking.trip_details.route_polyline;
+
+    // Fallback to coordinates dictionary if not found in booking details
+    if (!pickupCoords && booking.trip_details.pickup_location) {
+        pickupCoords = terminalCoordinates[booking.trip_details.pickup_location];
+    }
+    if (!dropCoords && booking.trip_details.drop_location) {
+        dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+    }
+
+    if (!pickupCoords || !dropCoords) {
+        console.warn("Could not find coordinates for booking:", booking.id);
+        utils.hideElement(mapContainer);
+        return;
+    }
+
+    try {
+        // Initialize Leaflet map
+        const map = L.map(mapId, {
+            dragging: false,
+            touchZoom: false,
+            doubleClickZoom: false,
+            scrollWheelZoom: false,
+            boxZoom: false,
+            keyboard: false,
+            zoomControl: false,
+            attributionControl: false
+        }).setView(pickupCoords, 12);
+
+        // Add CartoDB Dark Matter tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 20
+        }).addTo(map);
+
+        // Plot Pickup and Drop markers
+        const pickupMarker = L.marker(pickupCoords, { title: "Pickup Location" }).addTo(map);
+        const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
+
+        // Bind simple popups
+        pickupMarker.bindPopup(`<b>Pickup:</b> ${booking.trip_details.pickup_location}`);
+        dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
+
+        // Plot polyline
+        if (polyline && polyline.length > 0) {
+            L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+        } else {
+            // Draw straight-line fallback
+            L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+        }
+
+        // Adjust bounds
+        const group = new L.featureGroup([pickupMarker, dropMarker]);
+        setTimeout(() => {
+            map.invalidateSize();
+            map.fitBounds(group.getBounds().pad(0.15));
+        }, 100);
+
+        riderMaps[booking.id] = map;
+    } catch (err) {
+        console.error("Failed to initialize rider map:", err);
+    }
+}
+
+function destroyRiderMap(bookingId) {
+    if (riderMaps[bookingId]) {
+        try {
+            riderMaps[bookingId].remove();
+        } catch (e) {
+            console.error("Error removing rider map instance:", e);
+        }
+        delete riderMaps[bookingId];
+    }
+    const mapId = `map-rider-${bookingId}`;
+    const mapContainer = document.getElementById(mapId);
+    if (mapContainer) {
+        utils.hideElement(mapContainer);
+    }
 }

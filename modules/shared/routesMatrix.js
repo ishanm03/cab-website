@@ -56,3 +56,19 @@ export function getRouteMetrics(pickup, drop) {
     if (!routesMatrix[pickup] || !routesMatrix[pickup][drop]) return null;
     return routesMatrix[pickup][drop];
 }
+
+/**
+ * Coordinates Dictionary Fallback for Popular Terminals
+ * Matches the exact names inside the routes matrix.
+ */
+export const terminalCoordinates = {
+    "Howrah Station": [22.5833, 88.3414],
+    "Airport": [22.6547, 88.4467],
+    "Esplanade": [22.5644, 88.3518],
+    "Salt Lake": [22.5735, 88.4331],
+    "Digha": [21.6266, 87.5074],
+    "Mayapur": [23.4231, 88.3908],
+    "Shantiniketan": [23.6787, 87.6934],
+    "Mandarmani": [21.6620, 87.6002],
+    "Tarapith": [24.1139, 87.7971]
+};
