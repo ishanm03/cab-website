@@ -447,8 +447,8 @@ function initRiderMap(booking) {
             attributionControl: false
         }).setView(pickupCoords, 12);
 
-        // Add CartoDB Dark Matter tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        // Add CartoDB Positron Light tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 20
         }).addTo(map);
 
