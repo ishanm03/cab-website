@@ -391,6 +391,9 @@ function renderBookings() {
                     <button type="button" class="btn-reject flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-rose-400 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95" data-id="${booking.id}">
                         Reject
                     </button>
+                    <button type="button" class="btn-text-rider flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-amber-400 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95" data-id="${booking.id}">
+                        Text Rider
+                    </button>
                 ` : ""}
 
                 ${booking.status === "confirmed" ? `
@@ -473,6 +476,26 @@ function bindCardActionButtonEvents() {
                     console.error("IshanCabs: Failed to complete ride", error);
                     utils.showAlert(adminAlert, "Status update failed: " + error.message);
                 }
+            }
+        });
+    });
+
+    // 4. Text Rider trigger
+    const textButtons = document.querySelectorAll(".btn-text-rider");
+    textButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const bookingId = btn.getAttribute("data-id");
+            const booking = bookingsData.find(b => b.id === bookingId);
+            if (booking && booking.customer_details && booking.customer_details.phone) {
+                const phone = booking.customer_details.phone;
+                let cleanNumber = phone.replace(/\D/g, "");
+                if (cleanNumber.length === 10) {
+                    cleanNumber = "91" + cleanNumber;
+                }
+                const url = `https://wa.me/${cleanNumber}`;
+                window.open(url, "_blank");
+            } else {
+                alert("Rider phone details are unavailable.");
             }
         });
     });
