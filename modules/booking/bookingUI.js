@@ -842,7 +842,7 @@ async function handleFinalConfirm() {
             outstation_days: currentRouteData.category === "outstation" ? currentRouteData.days : null,
             pickup_coords: currentRouteData.pickupCoords || null,
             drop_coords: currentRouteData.dropCoords || null,
-            route_polyline: currentRouteData.polyline || null
+            route_polyline: currentRouteData.polyline ? JSON.stringify(currentRouteData.polyline) : null
         },
         fare_details: {
             vehicle_tier: selectedVehicleTier,

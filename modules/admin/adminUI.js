@@ -568,6 +568,14 @@ function initAdminMap(booking) {
     let pickupCoords = booking.trip_details.pickup_coords;
     let dropCoords = booking.trip_details.drop_coords;
     let polyline = booking.trip_details.route_polyline;
+    if (typeof polyline === "string") {
+        try {
+            polyline = JSON.parse(polyline);
+        } catch (e) {
+            console.error("Failed to parse route_polyline:", e);
+            polyline = null;
+        }
+    }
 
     // Fallback to predefined coordinates dictionary if not stored
     if (!pickupCoords && booking.trip_details.pickup_location) {
