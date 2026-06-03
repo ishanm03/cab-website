@@ -595,8 +595,8 @@ function initAdminMap(booking) {
             attributionControl: false
         }).setView(pickupCoords, 12);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 20
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
         }).addTo(map);
 
         const pickupMarker = L.marker(pickupCoords, { title: "Pickup Location" }).addTo(map);

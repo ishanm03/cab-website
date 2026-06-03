@@ -447,9 +447,9 @@ function initRiderMap(booking) {
             attributionControl: false
         }).setView(pickupCoords, 12);
 
-        // Add CartoDB Positron Light tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 20
+        // Add OpenStreetMap Standard tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
         }).addTo(map);
 
         // Plot Pickup and Drop markers
