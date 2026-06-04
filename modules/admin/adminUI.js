@@ -4,6 +4,7 @@ import { auth, db } from "../shared/firebase.js";
 import { authService } from "../auth/authService.js";
 import { utils } from "../shared/utils.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { terminalCoordinates } from "../shared/routesMatrix.js";
 import { 
     collection, 
     query, 
@@ -59,6 +60,7 @@ let rosterData = {};
 let currentStatusFilter = "all"; // "all" | "pending_approval" | "confirmed" | "completed" | "rejected"
 let firebaseAuthUnsubscribe = null;
 let firestoreUnsubscribe = null;
+let adminMaps = {}; // booking.id -> Leaflet map instance
 
 // Initialize Dashboard
 document.addEventListener("DOMContentLoaded", () => {
@@ -244,6 +246,7 @@ function setupFilterTabs() {
 
 // Render filtered card summaries
 function renderBookings() {
+    destroyAllAdminMaps();
     bookingsListContainer.innerHTML = "";
     utils.hideElement(adminAlert);
 
@@ -372,6 +375,11 @@ function renderBookings() {
                     <p class="text-slate-300 italic">"${booking.feedback.comments || "No comments written."}"</p>
                 </div>
                 ` : ""}
+
+                <!-- Requested Route Map Preview -->
+                ${booking.status === "pending_approval" ? `
+                <div id="map-admin-${booking.id}" class="h-40 w-full mt-3 rounded-2xl border border-slate-800/80 overflow-hidden relative z-10"></div>
+                ` : ""}
             </div>
 
             <!-- Action Controllers Panel -->
@@ -382,6 +390,9 @@ function renderBookings() {
                     </button>
                     <button type="button" class="btn-reject flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-rose-400 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95" data-id="${booking.id}">
                         Reject
+                    </button>
+                    <button type="button" class="btn-text-rider flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-amber-400 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95" data-id="${booking.id}">
+                        Text Rider
                     </button>
                 ` : ""}
 
@@ -401,6 +412,13 @@ function renderBookings() {
         `;
 
         bookingsListContainer.appendChild(card);
+    });
+
+    // Initialize maps for all requested bookings
+    filteredBookings.forEach(booking => {
+        if (booking.status === "pending_approval") {
+            initAdminMap(booking);
+        }
     });
 
     // Bind action events dynamically to injected DOM buttons
@@ -458,6 +476,26 @@ function bindCardActionButtonEvents() {
                     console.error("IshanCabs: Failed to complete ride", error);
                     utils.showAlert(adminAlert, "Status update failed: " + error.message);
                 }
+            }
+        });
+    });
+
+    // 4. Text Rider trigger
+    const textButtons = document.querySelectorAll(".btn-text-rider");
+    textButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const bookingId = btn.getAttribute("data-id");
+            const booking = bookingsData.find(b => b.id === bookingId);
+            if (booking && booking.customer_details && booking.customer_details.phone) {
+                const phone = booking.customer_details.phone;
+                let cleanNumber = phone.replace(/\D/g, "");
+                if (cleanNumber.length === 10) {
+                    cleanNumber = "91" + cleanNumber;
+                }
+                const url = `https://wa.me/${cleanNumber}`;
+                window.open(url, "_blank");
+            } else {
+                alert("Rider phone details are unavailable.");
             }
         });
     });
@@ -543,4 +581,88 @@ async function handleLogout() {
             alert("Sign out failed: " + error.message);
         }
     }
+}
+
+function initAdminMap(booking) {
+    const mapId = `map-admin-${booking.id}`;
+    const mapContainer = document.getElementById(mapId);
+    if (!mapContainer) return;
+
+    let pickupCoords = booking.trip_details.pickup_coords;
+    let dropCoords = booking.trip_details.drop_coords;
+    let polyline = booking.trip_details.route_polyline;
+    if (typeof polyline === "string") {
+        try {
+            polyline = JSON.parse(polyline);
+        } catch (e) {
+            console.error("Failed to parse route_polyline:", e);
+            polyline = null;
+        }
+    }
+
+    // Fallback to predefined coordinates dictionary if not stored
+    if (!pickupCoords && booking.trip_details.pickup_location) {
+        pickupCoords = terminalCoordinates[booking.trip_details.pickup_location];
+    }
+    if (!dropCoords && booking.trip_details.drop_location) {
+        dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+    }
+
+    if (!pickupCoords || !dropCoords) {
+        console.warn("Could not find coordinates for admin booking map:", booking.id);
+        mapContainer.style.display = "none";
+        return;
+    }
+
+    try {
+        const map = L.map(mapId, {
+            dragging: true,
+            touchZoom: true,
+            doubleClickZoom: true,
+            scrollWheelZoom: false, // Prevents scroll conflicts on panel body
+            boxZoom: true,
+            keyboard: true,
+            zoomControl: true,
+            attributionControl: false
+        }).setView(pickupCoords, 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        const pickupMarker = L.marker(pickupCoords, { title: "Pickup Location" }).addTo(map);
+        const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
+
+        pickupMarker.bindPopup(`<b>Pickup:</b> ${booking.trip_details.pickup_location}`);
+        dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
+
+        if (polyline && polyline.length > 0) {
+            L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+        } else {
+            L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+        }
+
+        const group = new L.featureGroup([pickupMarker, dropMarker]);
+        setTimeout(() => {
+            map.invalidateSize();
+            map.fitBounds(group.getBounds().pad(0.15));
+        }, 100);
+
+        adminMaps[booking.id] = map;
+    } catch (err) {
+        console.error("Failed to initialize admin map:", err);
+    }
+}
+
+function destroyAllAdminMaps() {
+    Object.keys(adminMaps).forEach(id => {
+        if (adminMaps[id]) {
+            try {
+                adminMaps[id].remove();
+            } catch (e) {
+                console.error("Error removing map instance:", e);
+            }
+        }
+    });
+    adminMaps = {};
 }

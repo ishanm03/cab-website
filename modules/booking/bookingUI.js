@@ -3,7 +3,7 @@
 import { auth } from "../shared/firebase.js";
 import { dbService } from "../shared/dbService.js";
 import { utils } from "../shared/utils.js";
-import { routesMatrix, getPickupLocations, getDropDestinations, getRouteMetrics } from "../shared/routesMatrix.js";
+import { routesMatrix, getPickupLocations, getDropDestinations, getRouteMetrics, terminalCoordinates } from "../shared/routesMatrix.js";
 import { bookingService } from "./bookingService.js";
 import { authService } from "../auth/authService.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -69,10 +69,28 @@ let currentRouteData = {
     category: "",
     days: 1,
     km: 0,
-    flatMetrics: null
+    flatMetrics: null,
+    pickupCoords: null,
+    dropCoords: null,
+    polyline: null
 };
 let selectedVehicleTier = null;
 let selectedVehicleFare = 0;
+
+// Map & Geocoding State Variables
+const bookingMapWrapper = document.getElementById("booking-map-wrapper");
+const mapSearchInput = document.getElementById("map-search-input");
+const btnMapSearch = document.getElementById("btn-map-search");
+const pickupCoordsBadge = document.getElementById("pickup-coords-badge");
+const dropCoordsBadge = document.getElementById("drop-coords-badge");
+
+let mapInstance = null;
+let pickupMarker = null;
+let dropMarker = null;
+let mapPickupCoords = null; // [lat, lng]
+let mapDropCoords = null;   // [lat, lng]
+let mapPickupAddress = "";
+let mapDropAddress = "";
 
 // Initialize setup listeners
 document.addEventListener("DOMContentLoaded", () => {
@@ -94,6 +112,7 @@ function initBookingUI() {
 
     // 4. Change pickups and populate drop options
     pickupSelect.addEventListener("change", handlePickupChange);
+    dropSelect.addEventListener("change", handleDropChange);
 
     // 5. Ride Category change to show/hide days selector
     categoryRadios.forEach(radio => {
@@ -158,7 +177,8 @@ async function handleLogout() {
 
 // Hydrates select with available locations
 function hydratePickupLocations() {
-    pickupSelect.innerHTML = `<option value="" disabled selected>Select Pickup Node</option>`;
+    pickupSelect.innerHTML = `<option value="" disabled selected>Select Pickup Node</option>
+                              <option value="Custom Location">Custom Location</option>`;
     const pickups = getPickupLocations();
     pickups.forEach(loc => {
         const opt = document.createElement("option");
@@ -178,13 +198,311 @@ function handlePickupChange() {
     dropSelect.disabled = false;
     dropSelect.className = "w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none";
 
-    const drops = getDropDestinations(pickupVal);
+    // Add Custom Location choice
+    const customOpt = document.createElement("option");
+    customOpt.value = "Custom Location";
+    customOpt.textContent = "Custom Location";
+    dropSelect.appendChild(customOpt);
+
+    let drops = [];
+    if (pickupVal === "Custom Location") {
+        drops = getPickupLocations();
+    } else {
+        drops = getDropDestinations(pickupVal);
+    }
     drops.forEach(dest => {
         const opt = document.createElement("option");
         opt.value = dest;
         opt.textContent = dest;
         dropSelect.appendChild(opt);
     });
+
+    toggleMapVisibility();
+}
+
+function handleDropChange() {
+    utils.hideElement(bookingAlert);
+    toggleMapVisibility();
+}
+
+function toggleMapVisibility() {
+    const isPickupCustom = pickupSelect.value === "Custom Location";
+    const isDropCustom = dropSelect.value === "Custom Location";
+
+    if (isPickupCustom || isDropCustom) {
+        utils.showElement(bookingMapWrapper);
+        initOrUpdateMap();
+    } else {
+        utils.hideElement(bookingMapWrapper);
+    }
+}
+
+function initOrUpdateMap() {
+    const kolkataCenter = [22.5726, 88.3639];
+
+    if (!mapInstance) {
+        // Initialize Leaflet map
+        mapInstance = L.map('booking-map').setView(kolkataCenter, 12);
+        
+        // Add OpenStreetMap Standard tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(mapInstance);
+
+        // Bind Search listeners
+        btnMapSearch.addEventListener("click", handleMapSearch);
+        mapSearchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleMapSearch();
+            }
+        });
+    }
+
+    const pickupVal = pickupSelect.value;
+    const dropVal = dropSelect.value;
+
+    // Resolve or default pickup coordinates
+    if (pickupVal === "Custom Location") {
+        if (!mapPickupCoords) {
+            mapPickupCoords = [22.5726, 88.3539];
+            mapPickupAddress = "Custom Pickup Location";
+        }
+    } else if (pickupVal && terminalCoordinates[pickupVal]) {
+        mapPickupCoords = terminalCoordinates[pickupVal];
+        mapPickupAddress = pickupVal;
+    } else {
+        mapPickupCoords = null;
+        mapPickupAddress = "";
+    }
+
+    // Resolve or default drop coordinates
+    if (dropVal === "Custom Location") {
+        if (!mapDropCoords) {
+            mapDropCoords = [22.5726, 88.3739];
+            mapDropAddress = "Custom Drop Location";
+        }
+    } else if (dropVal && terminalCoordinates[dropVal]) {
+        mapDropCoords = terminalCoordinates[dropVal];
+        mapDropAddress = dropVal;
+    } else {
+        mapDropCoords = null;
+        mapDropAddress = "";
+    }
+
+    // Draw/update Pickup Marker
+    if (mapPickupCoords) {
+        const isDraggable = pickupVal === "Custom Location";
+        if (pickupMarker) {
+            pickupMarker.setLatLng(mapPickupCoords);
+            if (isDraggable) {
+                pickupMarker.dragging.enable();
+            } else {
+                pickupMarker.dragging.disable();
+            }
+        } else {
+            pickupMarker = L.marker(mapPickupCoords, {
+                draggable: isDraggable,
+                title: "Pickup Location"
+            }).addTo(mapInstance);
+
+            pickupMarker.on('dragend', async () => {
+                const latlng = pickupMarker.getLatLng();
+                mapPickupCoords = [latlng.lat, latlng.lng];
+                updateCoordsBadges();
+                mapPickupAddress = await reverseGeocode(latlng.lat, latlng.lng);
+                updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
+            });
+        }
+        updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
+    } else {
+        if (pickupMarker) {
+            mapInstance.removeLayer(pickupMarker);
+            pickupMarker = null;
+        }
+    }
+
+    // Draw/update Drop Marker
+    if (mapDropCoords) {
+        const isDraggable = dropVal === "Custom Location";
+        if (dropMarker) {
+            dropMarker.setLatLng(mapDropCoords);
+            if (isDraggable) {
+                dropMarker.dragging.enable();
+            } else {
+                dropMarker.dragging.disable();
+            }
+        } else {
+            dropMarker = L.marker(mapDropCoords, {
+                draggable: isDraggable,
+                title: "Drop Location"
+            }).addTo(mapInstance);
+
+            dropMarker.on('dragend', async () => {
+                const latlng = dropMarker.getLatLng();
+                mapDropCoords = [latlng.lat, latlng.lng];
+                updateCoordsBadges();
+                mapDropAddress = await reverseGeocode(latlng.lat, latlng.lng);
+                updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
+            });
+        }
+        updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
+    } else {
+        if (dropMarker) {
+            mapInstance.removeLayer(dropMarker);
+            dropMarker = null;
+        }
+    }
+
+    updateCoordsBadges();
+
+    // Adjust view size and bounds
+    setTimeout(() => {
+        if (mapInstance) {
+            mapInstance.invalidateSize();
+            if (mapPickupCoords && mapDropCoords) {
+                const group = new L.featureGroup([pickupMarker, dropMarker]);
+                mapInstance.fitBounds(group.getBounds().pad(0.15));
+            } else if (mapPickupCoords) {
+                mapInstance.setView(mapPickupCoords, 14);
+            } else if (mapDropCoords) {
+                mapInstance.setView(mapDropCoords, 14);
+            }
+        }
+    }, 100);
+}
+
+async function reverseGeocode(lat, lng) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+            headers: {
+                'Accept-Language': 'en'
+            }
+        });
+        if (!response.ok) throw new Error("Reverse geocode failed");
+        const data = await response.json();
+        return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } catch (err) {
+        console.error("Reverse geocoding error:", err);
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+}
+
+function updateMarkerPopup(marker, text) {
+    if (!marker) return;
+    marker.bindPopup(text).openPopup();
+}
+
+function updateCoordsBadges() {
+    if (mapPickupCoords) {
+        pickupCoordsBadge.textContent = `Pickup Coords: ${mapPickupCoords[0].toFixed(4)}, ${mapPickupCoords[1].toFixed(4)}`;
+    } else {
+        pickupCoordsBadge.textContent = "Pickup Coords: --, --";
+    }
+    if (mapDropCoords) {
+        dropCoordsBadge.textContent = `Drop Coords: ${mapDropCoords[0].toFixed(4)}, ${mapDropCoords[1].toFixed(4)}`;
+    } else {
+        dropCoordsBadge.textContent = "Drop Coords: --, --";
+    }
+}
+
+async function handleMapSearch() {
+    const query = mapSearchInput.value.trim();
+    if (!query) return;
+
+    const targetRadio = document.querySelector('input[name="search-target"]:checked');
+    const target = targetRadio ? targetRadio.value : "pickup";
+
+    const isPickupCustom = pickupSelect.value === "Custom Location";
+    const isDropCustom = dropSelect.value === "Custom Location";
+
+    if (target === "pickup" && !isPickupCustom) {
+        alert("Pickup location is not set to 'Custom Location'. Change selection in the dropdown first.");
+        return;
+    }
+    if (target === "drop" && !isDropCustom) {
+        alert("Drop location is not set to 'Custom Location'. Change selection in the dropdown first.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, {
+            headers: {
+                'Accept-Language': 'en'
+            }
+        });
+        if (!response.ok) throw new Error("Geocode search failed");
+        const results = await response.json();
+        if (results && results.length > 0) {
+            const lat = parseFloat(results[0].lat);
+            const lng = parseFloat(results[0].lon);
+            const address = results[0].display_name;
+
+            if (target === "pickup") {
+                mapPickupCoords = [lat, lng];
+                mapPickupAddress = address;
+                if (pickupMarker) {
+                    pickupMarker.setLatLng(mapPickupCoords);
+                } else {
+                    pickupMarker = L.marker(mapPickupCoords, { draggable: true, title: "Pickup Location" }).addTo(mapInstance);
+                }
+                updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
+            } else {
+                mapDropCoords = [lat, lng];
+                mapDropAddress = address;
+                if (dropMarker) {
+                    dropMarker.setLatLng(mapDropCoords);
+                } else {
+                    dropMarker = L.marker(mapDropCoords, { draggable: true, title: "Drop Location" }).addTo(mapInstance);
+                }
+                updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
+            }
+
+            updateCoordsBadges();
+
+            if (mapPickupCoords && mapDropCoords) {
+                const group = new L.featureGroup([pickupMarker, dropMarker]);
+                mapInstance.fitBounds(group.getBounds().pad(0.15));
+            } else {
+                mapInstance.setView([lat, lng], 14);
+            }
+        } else {
+            alert("No results found for that address.");
+        }
+    } catch (err) {
+        console.error("Geocoding error:", err);
+        alert("Search failed: " + err.message);
+    }
+}
+
+async function fetchOSRMRoute(pickupCoords, dropCoords) {
+    const pickupLng = pickupCoords[1];
+    const pickupLat = pickupCoords[0];
+    const dropLng = dropCoords[1];
+    const dropLat = dropCoords[0];
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropLng},${dropLat}?overview=full&geometries=geojson`;
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error("Failed to fetch route from OSRM");
+    }
+    const data = await response.json();
+    if (!data.routes || data.routes.length === 0) {
+        throw new Error("No route found between selected coordinates");
+    }
+    return data.routes[0];
+}
+
+function getHaversineDistance(coords1, coords2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (coords2[0] - coords1[0]) * Math.PI / 180;
+    const dLng = (coords2[1] - coords1[1]) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(coords1[0] * Math.PI / 180) * Math.cos(coords2[0] * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.ceil(R * c * 1.3); // Apply 30% routing overhead to approximate actual driving distance
 }
 
 // Shows/Hides outstation days
@@ -290,30 +608,83 @@ async function handleStep1Submit(e) {
         return;
     }
 
-    showLoader("Querying fleet inventory & calculating rates...");
+    // Resolve coordinates
+    let pickupCoords = null;
+    let dropCoords = null;
 
-    // Retrieve distance and base flat rates from Routes Matrix
-    const metrics = getRouteMetrics(pickup, drop);
-    if (!metrics) {
-        hideLoader(panelStep1);
-        utils.showAlert(bookingAlert, "Selected route configuration is invalid.");
+    if (pickup === "Custom Location") {
+        if (!mapPickupCoords) {
+            utils.showAlert(bookingAlert, "Please select a custom pickup location on the map.");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        pickupCoords = mapPickupCoords;
+    } else if (pickup && terminalCoordinates[pickup]) {
+        pickupCoords = terminalCoordinates[pickup];
+    }
+
+    if (drop === "Custom Location") {
+        if (!mapDropCoords) {
+            utils.showAlert(bookingAlert, "Please select a custom drop location on the map.");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        dropCoords = mapDropCoords;
+    } else if (drop && terminalCoordinates[drop]) {
+        dropCoords = terminalCoordinates[drop];
+    }
+
+    if (!pickupCoords || !dropCoords) {
+        utils.showAlert(bookingAlert, "Pickup and Destination coordinates could not be resolved.");
         return;
     }
 
+    showLoader("Querying fleet inventory & calculating rates...");
+
+    let distanceKm = 0;
+    let polyline = null;
+
+    try {
+        // Query OSRM
+        const routeData = await fetchOSRMRoute(pickupCoords, dropCoords);
+        distanceKm = Math.round(routeData.distance / 1000) || 1;
+        const coords = routeData.geometry.coordinates; // array of [lng, lat]
+        polyline = coords.map(coord => [coord[1], coord[0]]); // convert to [lat, lng]
+    } catch (err) {
+        console.warn("Routing API failed, using fallback metrics:", err.message);
+        
+        // Fallback to Haversine distance
+        distanceKm = getHaversineDistance(pickupCoords, dropCoords);
+        polyline = [pickupCoords, dropCoords]; // Straight-line polyline fallback
+    }
+
+    // Check if flat metrics are applicable (only if BOTH are NOT custom and we have a matrix match)
+    let metrics = null;
+    if (pickup !== "Custom Location" && drop !== "Custom Location") {
+        metrics = getRouteMetrics(pickup, drop);
+    }
+
+    // Determine resolved pickup and drop display names
+    const resolvedPickupName = pickup === "Custom Location" ? (mapPickupAddress || "Custom Pickup Location") : pickup;
+    const resolvedDropName = drop === "Custom Location" ? (mapDropAddress || "Custom Drop Location") : drop;
+
     // Save configuration parameters globally
     currentRouteData = {
-        pickup: pickup,
-        drop: drop,
+        pickup: resolvedPickupName,
+        drop: resolvedDropName,
         dateString: dateVal,
         timeString: timeVal,
         category: category,
         days: days,
-        km: metrics.km,
-        flatMetrics: metrics
+        km: metrics ? metrics.km : distanceKm,
+        flatMetrics: metrics,
+        pickupCoords: pickupCoords,
+        dropCoords: dropCoords,
+        polyline: polyline
     };
 
     // Update Step 2 badge distance total
-    routeKmBadge.textContent = `Estimated: ${metrics.km} km`;
+    routeKmBadge.textContent = `Estimated: ${currentRouteData.km} km`;
 
     // Process rates and time-aware inventory availability check for each category (Sedan, SUV, MUV)
     try {
@@ -324,12 +695,12 @@ async function handleStep1Submit(e) {
             const fareDisplay = card.querySelector(".car-fare-display");
             const soldOutOverlay = card.querySelector(".sold-out-overlay");
 
-            // 1. Calculate fare dynamically
-            const fare = bookingService.calculateFare(category, metrics.km, days, tier, metrics);
+            // Calculate fare dynamically
+            const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics);
             fareDisplay.textContent = `₹${fare.toLocaleString("en-IN")}`;
             card.dataset.computedFare = fare;
 
-            // 2. Overbooking inventory check
+            // Overbooking inventory check
             const isAvailable = await bookingService.checkAvailability(tier, dateVal);
             
             if (isAvailable) {
@@ -468,7 +839,10 @@ async function handleFinalConfirm() {
             drop_location: currentRouteData.drop,
             pickup_date: currentRouteData.dateString,
             pickup_time: currentRouteData.timeString,
-            outstation_days: currentRouteData.category === "outstation" ? currentRouteData.days : null
+            outstation_days: currentRouteData.category === "outstation" ? currentRouteData.days : null,
+            pickup_coords: currentRouteData.pickupCoords || null,
+            drop_coords: currentRouteData.dropCoords || null,
+            route_polyline: currentRouteData.polyline ? JSON.stringify(currentRouteData.polyline) : null
         },
         fare_details: {
             vehicle_tier: selectedVehicleTier,
