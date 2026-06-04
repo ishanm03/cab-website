@@ -62,9 +62,38 @@ const btnCloseReject = document.getElementById("btn-close-reject");
 
 // Workspace View Switchers
 const viewBookingsTab = document.getElementById("view-bookings-tab");
+const viewFleetTab = document.getElementById("view-fleet-tab");
+const viewDriversTab = document.getElementById("view-drivers-tab");
 const viewSettingsTab = document.getElementById("view-settings-tab");
 const panelBookings = document.getElementById("panel-bookings");
+const panelFleet = document.getElementById("panel-fleet");
+const panelDrivers = document.getElementById("panel-drivers");
 const panelSettings = document.getElementById("panel-settings");
+
+// Fleet inventory elements
+const vehicleForm = document.getElementById("vehicle-form");
+const vehicleEditId = document.getElementById("vehicle-edit-id");
+const vehicleModel = document.getElementById("vehicle-model");
+const vehiclePlate = document.getElementById("vehicle-plate");
+const vehicleTier = document.getElementById("vehicle-tier");
+const vehicleStatus = document.getElementById("vehicle-status");
+const vehicleDriver = document.getElementById("vehicle-driver");
+const btnSaveVehicle = document.getElementById("btn-save-vehicle");
+const btnCancelVehicle = document.getElementById("btn-cancel-vehicle");
+const btnSeedFleet = document.getElementById("btn-seed-fleet");
+const fleetInventoryTbody = document.getElementById("fleet-inventory-tbody");
+
+// Driver registry elements
+const driverForm = document.getElementById("driver-form");
+const driverEditId = document.getElementById("driver-edit-id");
+const driverName = document.getElementById("driver-name");
+const driverPhone = document.getElementById("driver-phone");
+const driverLicense = document.getElementById("driver-license");
+const driverStatus = document.getElementById("driver-status");
+const driverVehicle = document.getElementById("driver-vehicle");
+const btnSaveDriver = document.getElementById("btn-save-driver");
+const btnCancelDriver = document.getElementById("btn-cancel-driver");
+const driverRegistryTbody = document.getElementById("driver-registry-tbody");
 
 // Fares Configuration Form
 const faresMatrixForm = document.getElementById("fares-matrix-form");
@@ -101,6 +130,10 @@ let rosterData = {};
 let currentStatusFilter = "all"; // "all" | "pending_approval" | "confirmed" | "active" | "completed" | "rejected"
 let firebaseAuthUnsubscribe = null;
 let firestoreUnsubscribe = null;
+let firestoreFleetUnsubscribe = null;
+let firestoreDriversUnsubscribe = null;
+let vehiclesData = [];
+let driversData = [];
 let adminMaps = {}; // booking.id -> Leaflet map instance
 
 // Initialize Dashboard
@@ -145,6 +178,13 @@ function initAdminUI() {
     // 9. Bind dynamic settings & coupon forms
     faresMatrixForm.addEventListener("submit", handleFaresFormSubmit);
     promoCodeForm.addEventListener("submit", handlePromoFormSubmit);
+
+    // 10. Bind Fleet Inventory and Driver Registry forms and actions
+    if (vehicleForm) vehicleForm.addEventListener("submit", handleVehicleFormSubmit);
+    if (driverForm) driverForm.addEventListener("submit", handleDriverFormSubmit);
+    if (btnCancelVehicle) btnCancelVehicle.addEventListener("click", resetVehicleForm);
+    if (btnCancelDriver) btnCancelDriver.addEventListener("click", resetDriverForm);
+    if (btnSeedFleet) btnSeedFleet.addEventListener("click", seedDefaultFleet);
 }
 
 // Security: Force rerouting if user is not authorized as Admin
@@ -158,6 +198,7 @@ async function handleAdminSessionChange(user) {
         
         // Start streaming bookings data in real-time
         startBookingsSnapshotListener();
+        startFleetSnapshotListeners();
 
         // Prefetch settings and promo configuration arrays
         loadFaresMatrix();
@@ -209,34 +250,69 @@ function startBookingsSnapshotListener() {
     }
 }
 
-// Pull the central fleet roster JSON relativamente to populate dropdown choices
-async function loadFleetRoster() {
-    try {
-        const response = await fetch("../booking/dummyFleet.json");
-        if (response.ok) {
-            rosterData = await response.json();
-            
-            // Hydrate Roster Select dropdown
-            approveRosterSelect.innerHTML = '<option value="" selected>-- Type manual details below --</option>';
-            
-            // Group drivers under vehicle classes
-            Object.keys(rosterData).forEach(tier => {
-                const group = document.createElement("optgroup");
-                group.label = tier.toUpperCase() + " Class";
-                
-                rosterData[tier].forEach(driver => {
-                    const option = document.createElement("option");
-                    option.textContent = `${driver.driver_name} (${driver.vehicle_number})`;
-                    // Stringify data to capture all metrics easily
-                    option.value = JSON.stringify(driver);
-                    group.appendChild(option);
+// Dynamic fleet roster loader using Firestore active associations
+function loadFleetRoster() {
+    if (!approveRosterSelect) return;
+
+    const activeRoster = {
+        sedan: [],
+        suv: [],
+        muv: []
+    };
+
+    driversData.forEach(driver => {
+        if (driver.status === "active" && driver.assigned_vehicle_id) {
+            const vehicle = vehiclesData.find(v => v.id === driver.assigned_vehicle_id);
+            if (vehicle && vehicle.status === "active" && activeRoster[vehicle.tier]) {
+                activeRoster[vehicle.tier].push({
+                    driver_id: driver.id,
+                    driver_name: driver.name,
+                    driver_phone: driver.phone,
+                    vehicle_id: vehicle.id,
+                    vehicle_number: vehicle.plate_number,
+                    vehicle_tier: vehicle.tier,
+                    vehicle_model: vehicle.model
                 });
-                approveRosterSelect.appendChild(group);
-            });
+            }
         }
-    } catch (err) {
-        console.warn("IshanCabs: Failed to load dummyFleet roster configurations for dropdown:", err.message);
-    }
+    });
+
+    approveRosterSelect.innerHTML = '<option value="" selected>-- Choose dynamic driver & car --</option>';
+
+    Object.keys(activeRoster).forEach(tier => {
+        const group = document.createElement("optgroup");
+        group.label = tier.toUpperCase() + " Class";
+        
+        activeRoster[tier].forEach(item => {
+            const isBusy = bookingsData.some(b => 
+                (b.status === "confirmed" || b.status === "active") && 
+                b.driver_assignment && 
+                (b.driver_assignment.vehicle_number === item.vehicle_number || b.driver_assignment.driver_phone === item.driver_phone)
+            );
+
+            const label = isBusy 
+                ? `${item.driver_name} (${item.vehicle_number}) - [Busy - On Ride]` 
+                : `${item.driver_name} (${item.vehicle_number})`;
+
+            const option = document.createElement("option");
+            option.textContent = label;
+            
+            option.value = JSON.stringify({
+                driver_name: item.driver_name,
+                driver_phone: item.driver_phone,
+                vehicle_number: item.vehicle_number,
+                is_busy: isBusy
+            });
+
+            if (isBusy) {
+                option.className = "text-slate-500 italic";
+            } else {
+                option.className = "text-white font-semibold";
+            }
+            group.appendChild(option);
+        });
+        approveRosterSelect.appendChild(group);
+    });
 }
 
 // Option A autofills Option B for seamless speed + flexibility
@@ -248,6 +324,10 @@ function handleRosterSelectionChange() {
             approveDriverName.value = driver.driver_name || "";
             approveDriverPhone.value = driver.driver_phone || "";
             approveVehicleNumber.value = driver.vehicle_number || "";
+
+            if (driver.is_busy) {
+                alert(`Warning: This driver/car is currently assigned to a confirmed or active ride. Confirming this assignment will conflict unless you select another.`);
+            }
         } catch (err) {
             console.error("Failed to parse stringified roster data", err);
         }
@@ -642,6 +722,19 @@ async function handleApprovalFormSubmit(e) {
         return;
     }
 
+    // Double-booking conflict checker
+    const conflictBooking = bookingsData.find(b => 
+        b.id !== bookingId &&
+        (b.status === "confirmed" || b.status === "active") &&
+        b.driver_assignment &&
+        (b.driver_assignment.vehicle_number === vehicleNumber || b.driver_assignment.driver_phone === driverPhone)
+    );
+
+    if (conflictBooking) {
+        alert(`Assignment Conflict: Driver or Car is already assigned to active Booking ID: ${conflictBooking.booking_id} (Status: ${conflictBooking.status === "active" ? "On-Going" : "Confirmed"}). Please select another driver/car.`);
+        return;
+    }
+
     utils.hideElement(approvalModal);
     utils.showAlert(adminAlert, "Allocating driver and confirming ride...", "success");
 
@@ -719,6 +812,8 @@ async function handleLogout() {
         try {
             // Unsubscribe listeners
             if (firestoreUnsubscribe) firestoreUnsubscribe();
+            if (firestoreFleetUnsubscribe) firestoreFleetUnsubscribe();
+            if (firestoreDriversUnsubscribe) firestoreDriversUnsubscribe();
             if (firebaseAuthUnsubscribe) firebaseAuthUnsubscribe();
             
             await authService.logout();
@@ -828,28 +923,34 @@ function destroyAllAdminMaps() {
 // =========================================================================
 
 function setupViewSwitchers() {
-    viewBookingsTab.addEventListener("click", () => {
-        // Swap active tab visual styles
-        viewBookingsTab.className = "pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200";
-        viewSettingsTab.className = "pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200";
-        
-        utils.showElement(panelBookings);
-        utils.hideElement(panelSettings);
-        
-        renderBookings();
-    });
+    const tabs = [
+        { btn: viewBookingsTab, panel: panelBookings },
+        { btn: viewFleetTab, panel: panelFleet },
+        { btn: viewDriversTab, panel: panelDrivers },
+        { btn: viewSettingsTab, panel: panelSettings }
+    ];
 
-    viewSettingsTab.addEventListener("click", () => {
-        // Swap active tab visual styles
-        viewSettingsTab.className = "pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200";
-        viewBookingsTab.className = "pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200";
-        
-        utils.hideElement(panelBookings);
-        utils.showElement(panelSettings);
-        
-        // Hydrate data grids
-        loadFaresMatrix();
-        loadPromoOffers();
+    tabs.forEach(tab => {
+        if (!tab.btn) return;
+        tab.btn.addEventListener("click", () => {
+            tabs.forEach(t => {
+                if (t.btn) {
+                    if (t === tab) {
+                        t.btn.className = "pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200";
+                        utils.showElement(t.panel);
+                    } else {
+                        t.btn.className = "pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200";
+                        utils.hideElement(t.panel);
+                    }
+                }
+            });
+            if (tab.btn === viewBookingsTab) {
+                renderBookings();
+            } else if (tab.btn === viewSettingsTab) {
+                loadFaresMatrix();
+                loadPromoOffers();
+            }
+        });
     });
 }
 
@@ -1062,6 +1163,554 @@ async function handlePromoFormSubmit(e) {
     } catch (err) {
         console.error("Failed to create offer:", err);
         utils.showAlert(adminAlert, "Offer creation failed: " + err.message);
+    }
+}
+
+// =========================================================================
+// FLEET INVENTORY & DRIVER REGISTRY ACTIONS
+// =========================================================================
+
+function startFleetSnapshotListeners() {
+    if (!db) return;
+
+    const vehiclesQuery = query(collection(db, "vehicles"), orderBy("creation_ts", "desc"));
+    firestoreFleetUnsubscribe = onSnapshot(vehiclesQuery, (snapshot) => {
+        vehiclesData = [];
+        snapshot.forEach(doc => {
+            vehiclesData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        renderFleetInventory();
+        populateAssociationDropdowns();
+        loadFleetRoster();
+    }, (error) => {
+        console.error("Vehicles stream error:", error);
+    });
+
+    const driversQuery = query(collection(db, "drivers"), orderBy("creation_ts", "desc"));
+    firestoreDriversUnsubscribe = onSnapshot(driversQuery, (snapshot) => {
+        driversData = [];
+        snapshot.forEach(doc => {
+            driversData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        renderDriverRegistry();
+        populateAssociationDropdowns();
+        loadFleetRoster();
+    }, (error) => {
+        console.error("Drivers stream error:", error);
+    });
+}
+
+function renderFleetInventory() {
+    if (!fleetInventoryTbody) return;
+    fleetInventoryTbody.innerHTML = "";
+    
+    if (vehiclesData.length === 0) {
+        fleetInventoryTbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 italic">No vehicles registered yet. Click seed defaults to test quickly.</td>
+            </tr>
+        `;
+        utils.showElement(btnSeedFleet);
+        return;
+    }
+    utils.hideElement(btnSeedFleet);
+
+    vehiclesData.forEach(vehicle => {
+        const tr = document.createElement("tr");
+        tr.className = "border-b border-slate-900/60 hover:bg-slate-900/20 transition-all";
+        
+        let driverNameStr = "Unassigned";
+        if (vehicle.assigned_driver_id) {
+            const driverObj = driversData.find(d => d.id === vehicle.assigned_driver_id);
+            driverNameStr = driverObj ? `${driverObj.name} (${driverObj.phone})` : "Assigned (Loading...)";
+        }
+
+        let tierBadgeClass = "bg-slate-800 text-slate-350";
+        if (vehicle.tier === "sedan") tierBadgeClass = "bg-blue-500/10 border border-blue-500/20 text-blue-400";
+        if (vehicle.tier === "suv") tierBadgeClass = "bg-amber-500/10 border border-amber-500/20 text-amber-400";
+        if (vehicle.tier === "muv") tierBadgeClass = "bg-purple-500/10 border border-purple-500/20 text-purple-400";
+
+        let statusBadgeClass = "bg-slate-800 text-slate-400";
+        if (vehicle.status === "active") statusBadgeClass = "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+        if (vehicle.status === "maintenance") statusBadgeClass = "bg-amber-500/10 border border-amber-500/20 text-amber-400";
+
+        tr.innerHTML = `
+            <td class="py-4 px-5 font-bold text-white">${vehicle.model}</td>
+            <td class="py-4 px-5 font-mono uppercase text-slate-300">${vehicle.plate_number}</td>
+            <td class="py-4 px-5">
+                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${tierBadgeClass} uppercase">${vehicle.tier}</span>
+            </td>
+            <td class="py-4 px-5 text-slate-400">${driverNameStr}</td>
+            <td class="py-4 px-5">
+                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass} uppercase">${vehicle.status}</span>
+            </td>
+            <td class="py-4 px-5 text-right space-x-2">
+                <button type="button" class="btn-edit-vehicle text-amber-500 hover:underline font-semibold text-xs" data-id="${vehicle.id}">Edit</button>
+                <button type="button" class="btn-delete-vehicle text-rose-500 hover:underline font-semibold text-xs" data-id="${vehicle.id}">Delete</button>
+            </td>
+        `;
+        fleetInventoryTbody.appendChild(tr);
+    });
+
+    bindFleetActionButtons();
+}
+
+function renderDriverRegistry() {
+    if (!driverRegistryTbody) return;
+    driverRegistryTbody.innerHTML = "";
+
+    if (driversData.length === 0) {
+        driverRegistryTbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 italic">No drivers registered yet. Register drivers on the left.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    driversData.forEach(driver => {
+        const tr = document.createElement("tr");
+        tr.className = "border-b border-slate-900/60 hover:bg-slate-900/20 transition-all";
+
+        let vehicleStr = "Unassigned";
+        if (driver.assigned_vehicle_id) {
+            const vehObj = vehiclesData.find(v => v.id === driver.assigned_vehicle_id);
+            vehicleStr = vehObj ? `${vehObj.model} (${vehObj.plate_number})` : "Assigned (Loading...)";
+        }
+
+        let statusBadgeClass = "bg-slate-800 text-slate-400";
+        if (driver.status === "active") statusBadgeClass = "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+        if (driver.status === "sick") statusBadgeClass = "bg-rose-500/10 border border-rose-500/20 text-rose-400";
+        if (driver.status === "on_leave") statusBadgeClass = "bg-blue-500/10 border border-blue-500/20 text-blue-400";
+
+        tr.innerHTML = `
+            <td class="py-4 px-5 font-bold text-white">${driver.name}</td>
+            <td class="py-4 px-5 text-slate-300 font-mono">${driver.phone}</td>
+            <td class="py-4 px-5 text-slate-300 uppercase">${driver.license_number}</td>
+            <td class="py-4 px-5 text-slate-400">${vehicleStr}</td>
+            <td class="py-4 px-5">
+                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass} uppercase">${driver.status.replace('_', ' ')}</span>
+            </td>
+            <td class="py-4 px-5 text-right space-x-2">
+                <button type="button" class="btn-edit-driver text-amber-500 hover:underline font-semibold text-xs" data-id="${driver.id}">Edit</button>
+                <button type="button" class="btn-delete-driver text-rose-500 hover:underline font-semibold text-xs" data-id="${driver.id}">Delete</button>
+            </td>
+        `;
+        driverRegistryTbody.appendChild(tr);
+    });
+
+    bindDriverActionButtons();
+}
+
+function populateAssociationDropdowns(editingVehicleId = null, editingDriverId = null) {
+    if (!vehicleDriver || !driverVehicle) return;
+
+    // 1. Vehicle form: Driver selector
+    const currentVehicleDriverVal = vehicleDriver.value;
+    vehicleDriver.innerHTML = '<option value="">-- None / Unassociated --</option>';
+    driversData.forEach(d => {
+        if (d.status !== "active") return;
+        
+        let label = `${d.name} (${d.phone})`;
+        if (d.assigned_vehicle_id) {
+            const associatedVeh = vehiclesData.find(v => v.id === d.assigned_vehicle_id);
+            if (associatedVeh) {
+                if (associatedVeh.id === editingVehicleId) {
+                    label += " [Currently Assigned]";
+                } else {
+                    label += ` [Assigned to ${associatedVeh.plate_number}]`;
+                }
+            }
+        }
+        
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = label;
+        vehicleDriver.appendChild(opt);
+    });
+    vehicleDriver.value = currentVehicleDriverVal;
+
+    // 2. Driver form: Vehicle selector
+    const currentDriverVehicleVal = driverVehicle.value;
+    driverVehicle.innerHTML = '<option value="">-- None / Unassociated --</option>';
+    vehiclesData.forEach(v => {
+        if (v.status !== "active") return;
+        
+        let label = `${v.model} (${v.plate_number}) - ${v.tier.toUpperCase()}`;
+        if (v.assigned_driver_id) {
+            const associatedD = driversData.find(d => d.id === v.assigned_driver_id);
+            if (associatedD) {
+                if (associatedD.id === editingDriverId) {
+                    label += " [Currently Assigned]";
+                } else {
+                    label += ` [Assigned to ${associatedD.name}]`;
+                }
+            }
+        }
+
+        const opt = document.createElement("option");
+        opt.value = v.id;
+        opt.textContent = label;
+        driverVehicle.appendChild(opt);
+    });
+    driverVehicle.value = currentDriverVehicleVal;
+}
+
+async function handleVehicleFormSubmit(e) {
+    e.preventDefault();
+    if (!db) return;
+
+    const modelVal = vehicleModel.value.trim();
+    const plateVal = vehiclePlate.value.trim().toUpperCase().replace(/\s+/g, '-');
+    const tierVal = vehicleTier.value;
+    const statusVal = vehicleStatus.value;
+    const driverIdVal = vehicleDriver.value; 
+    const editId = vehicleEditId.value;
+
+    const standardizedId = plateVal.replace(/[^A-Z0-9]/g, ""); 
+
+    utils.showAlert(adminAlert, "Saving vehicle in inventory...", "success");
+
+    try {
+        const vehicleDocRef = doc(db, "vehicles", standardizedId);
+
+        if (!editId && standardizedId !== editId) {
+            const docSnap = await getDoc(vehicleDocRef);
+            if (docSnap.exists()) {
+                alert(`Vehicle with Plate Number ${plateVal} already exists!`);
+                utils.hideElement(adminAlert);
+                return;
+            }
+        }
+
+        if (editId && editId !== standardizedId) {
+            await deleteDoc(doc(db, "vehicles", editId));
+        }
+
+        const vehiclePayload = {
+            model: modelVal,
+            plate_number: plateVal,
+            tier: tierVal,
+            status: statusVal,
+            assigned_driver_id: driverIdVal || null,
+            creation_ts: serverTimestamp()
+        };
+
+        await setDoc(vehicleDocRef, vehiclePayload);
+
+        // Link driver bidirectionally
+        if (driverIdVal) {
+            const driverDocRef = doc(db, "drivers", driverIdVal);
+            const driverSnap = await getDoc(driverDocRef);
+            if (driverSnap.exists()) {
+                const driverData = driverSnap.data();
+                const previousAssignedVehicleId = driverData.assigned_vehicle_id;
+                
+                if (previousAssignedVehicleId && previousAssignedVehicleId !== standardizedId) {
+                    await updateDoc(doc(db, "vehicles", previousAssignedVehicleId), {
+                        assigned_driver_id: null
+                    });
+                }
+            }
+            await updateDoc(driverDocRef, {
+                assigned_vehicle_id: standardizedId
+            });
+        } else {
+            // If we unassigned the driver, clear their driver record
+            if (editId) {
+                const prevVeh = vehiclesData.find(v => v.id === editId);
+                if (prevVeh && prevVeh.assigned_driver_id) {
+                    await updateDoc(doc(db, "drivers", prevVeh.assigned_driver_id), {
+                        assigned_vehicle_id: null
+                    });
+                }
+            }
+        }
+
+        // Unlink old driver if changed
+        if (editId && driverIdVal) {
+            const prevVehDoc = vehiclesData.find(v => v.id === editId);
+            if (prevVehDoc && prevVehDoc.assigned_driver_id && prevVehDoc.assigned_driver_id !== driverIdVal) {
+                await updateDoc(doc(db, "drivers", prevVehDoc.assigned_driver_id), {
+                    assigned_vehicle_id: null
+                });
+            }
+        }
+
+        resetVehicleForm();
+        utils.showAlert(adminAlert, "Vehicle details saved successfully!", "success");
+    } catch (error) {
+        console.error("Failed to save vehicle:", error);
+        utils.showAlert(adminAlert, "Failed to save vehicle: " + error.message);
+    }
+}
+
+async function handleDriverFormSubmit(e) {
+    e.preventDefault();
+    if (!db) return;
+
+    const nameVal = driverName.value.trim();
+    const phoneVal = driverPhone.value.trim();
+    const licenseVal = driverLicense.value.trim().toUpperCase();
+    const statusVal = driverStatus.value;
+    const vehicleIdVal = driverVehicle.value;
+    const editId = driverEditId.value;
+
+    const standardizedId = phoneVal.replace(/[^0-9]/g, ""); 
+
+    utils.showAlert(adminAlert, "Registering driver operator...", "success");
+
+    try {
+        const driverDocRef = doc(db, "drivers", standardizedId);
+
+        if (!editId && standardizedId !== editId) {
+            const docSnap = await getDoc(driverDocRef);
+            if (docSnap.exists()) {
+                alert(`Driver with phone number ${phoneVal} is already registered!`);
+                utils.hideElement(adminAlert);
+                return;
+            }
+        }
+
+        if (editId && editId !== standardizedId) {
+            await deleteDoc(doc(db, "drivers", editId));
+        }
+
+        const driverPayload = {
+            name: nameVal,
+            phone: phoneVal,
+            license_number: licenseVal,
+            status: statusVal,
+            assigned_vehicle_id: vehicleIdVal || null,
+            creation_ts: serverTimestamp()
+        };
+
+        await setDoc(driverDocRef, driverPayload);
+
+        // Link vehicle bidirectionally
+        if (vehicleIdVal) {
+            const vehDocRef = doc(db, "vehicles", vehicleIdVal);
+            const vehSnap = await getDoc(vehDocRef);
+            if (vehSnap.exists()) {
+                const vehData = vehSnap.data();
+                const previousAssignedDriverId = vehData.assigned_driver_id;
+                
+                if (previousAssignedDriverId && previousAssignedDriverId !== standardizedId) {
+                    await updateDoc(doc(db, "drivers", previousAssignedDriverId), {
+                        assigned_vehicle_id: null
+                    });
+                }
+            }
+            await updateDoc(vehDocRef, {
+                assigned_driver_id: standardizedId
+            });
+        } else {
+            if (editId) {
+                const prevDrv = driversData.find(d => d.id === editId);
+                if (prevDrv && prevDrv.assigned_vehicle_id) {
+                    await updateDoc(doc(db, "vehicles", prevDrv.assigned_vehicle_id), {
+                        assigned_driver_id: null
+                    });
+                }
+            }
+        }
+
+        // Unlink old vehicle if changed
+        if (editId && vehicleIdVal) {
+            const prevDriverDoc = driversData.find(d => d.id === editId);
+            if (prevDriverDoc && prevDriverDoc.assigned_vehicle_id && prevDriverDoc.assigned_vehicle_id !== vehicleIdVal) {
+                await updateDoc(doc(db, "vehicles", prevDriverDoc.assigned_vehicle_id), {
+                    assigned_driver_id: null
+                });
+            }
+        }
+
+        resetDriverForm();
+        utils.showAlert(adminAlert, "Driver registry updated successfully!", "success");
+    } catch (error) {
+        console.error("Failed to save driver:", error);
+        utils.showAlert(adminAlert, "Failed to save driver: " + error.message);
+    }
+}
+
+function bindFleetActionButtons() {
+    const editBtns = document.querySelectorAll(".btn-edit-vehicle");
+    editBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id");
+            const vehicle = vehiclesData.find(v => v.id === id);
+            if (vehicle) {
+                vehicleEditId.value = vehicle.id;
+                vehicleModel.value = vehicle.model;
+                vehiclePlate.value = vehicle.plate_number;
+                vehicleTier.value = vehicle.tier;
+                vehicleStatus.value = vehicle.status;
+                
+                populateAssociationDropdowns(vehicle.id, null);
+                vehicleDriver.value = vehicle.assigned_driver_id || "";
+
+                document.getElementById("fleet-form-title").textContent = "Edit Vehicle";
+                utils.showElement(btnCancelVehicle);
+            }
+        });
+    });
+
+    const deleteBtns = document.querySelectorAll(".btn-delete-vehicle");
+    deleteBtns.forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const confirmDelete = confirm(`Are you sure you want to delete vehicle ${id}?`);
+            if (confirmDelete && db) {
+                try {
+                    utils.showAlert(adminAlert, "Deleting vehicle...", "success");
+                    
+                    const vehicleObj = vehiclesData.find(v => v.id === id);
+                    if (vehicleObj && vehicleObj.assigned_driver_id) {
+                        await updateDoc(doc(db, "drivers", vehicleObj.assigned_driver_id), {
+                            assigned_vehicle_id: null
+                        });
+                    }
+                    
+                    await deleteDoc(doc(db, "vehicles", id));
+                    utils.showAlert(adminAlert, "Vehicle deleted successfully!", "success");
+                } catch (e) {
+                    console.error(e);
+                    utils.showAlert(adminAlert, "Delete failed: " + e.message);
+                }
+            }
+        });
+    });
+}
+
+function bindDriverActionButtons() {
+    const editBtns = document.querySelectorAll(".btn-edit-driver");
+    editBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id");
+            const driver = driversData.find(d => d.id === id);
+            if (driver) {
+                driverEditId.value = driver.id;
+                driverName.value = driver.name;
+                driverPhone.value = driver.phone;
+                driverLicense.value = driver.license_number;
+                driverStatus.value = driver.status;
+
+                populateAssociationDropdowns(null, driver.id);
+                driverVehicle.value = driver.assigned_vehicle_id || "";
+
+                document.getElementById("driver-form-title").textContent = "Edit Driver";
+                utils.showElement(btnCancelDriver);
+            }
+        });
+    });
+
+    const deleteBtns = document.querySelectorAll(".btn-delete-driver");
+    deleteBtns.forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const confirmDelete = confirm(`Are you sure you want to delete driver ${id}?`);
+            if (confirmDelete && db) {
+                try {
+                    utils.showAlert(adminAlert, "Deleting driver...", "success");
+                    
+                    const driverObj = driversData.find(d => d.id === id);
+                    if (driverObj && driverObj.assigned_vehicle_id) {
+                        await updateDoc(doc(db, "vehicles", driverObj.assigned_vehicle_id), {
+                            assigned_driver_id: null
+                        });
+                    }
+
+                    await deleteDoc(doc(db, "drivers", id));
+                    utils.showAlert(adminAlert, "Driver deleted successfully!", "success");
+                } catch (e) {
+                    console.error(e);
+                    utils.showAlert(adminAlert, "Delete failed: " + e.message);
+                }
+            }
+        });
+    });
+}
+
+function resetVehicleForm() {
+    vehicleEditId.value = "";
+    vehicleModel.value = "";
+    vehiclePlate.value = "";
+    vehicleTier.value = "sedan";
+    vehicleStatus.value = "active";
+    vehicleDriver.value = "";
+    document.getElementById("fleet-form-title").textContent = "Add Vehicle";
+    utils.hideElement(btnCancelVehicle);
+    populateAssociationDropdowns();
+}
+
+function resetDriverForm() {
+    driverEditId.value = "";
+    driverName.value = "";
+    driverPhone.value = "";
+    driverLicense.value = "";
+    driverStatus.value = "active";
+    driverVehicle.value = "";
+    document.getElementById("driver-form-title").textContent = "Register Driver";
+    utils.hideElement(btnCancelDriver);
+    populateAssociationDropdowns();
+}
+
+async function seedDefaultFleet() {
+    if (!db) return;
+    utils.showAlert(adminAlert, "Seeding default fleet data into database...", "success");
+    try {
+        const response = await fetch("../booking/dummyFleet.json");
+        if (!response.ok) throw new Error("Failed to load dummyFleet.json");
+        const dummyData = await response.json();
+
+        const modelMapping = {
+            sedan: "Maruti Swift Dzire",
+            suv: "Hyundai Creta",
+            muv: "Toyota Innova"
+        };
+
+        let count = 0;
+        for (const tier of Object.keys(dummyData)) {
+            const driversList = dummyData[tier];
+            for (const item of driversList) {
+                const vehiclePlateClean = item.vehicle_number.toUpperCase().trim();
+                const vehicleId = vehiclePlateClean.replace(/[^A-Z0-9]/g, ""); 
+                
+                const driverPhoneClean = item.driver_phone.trim();
+                const driverId = driverPhoneClean.replace(/[^0-9]/g, ""); 
+                
+                const randomLicenseNum = "DL-" + Math.floor(1000000000 + Math.random() * 9000000000);
+
+                const vehRef = doc(db, "vehicles", vehicleId);
+                await setDoc(vehRef, {
+                    model: modelMapping[tier] || "Fleet Car",
+                    plate_number: vehiclePlateClean,
+                    tier: tier,
+                    status: "active",
+                    assigned_driver_id: driverId,
+                    creation_ts: serverTimestamp()
+                });
+
+                const drvRef = doc(db, "drivers", driverId);
+                await setDoc(drvRef, {
+                    name: item.driver_name,
+                    phone: driverPhoneClean,
+                    license_number: randomLicenseNum,
+                    status: "active",
+                    assigned_vehicle_id: vehicleId,
+                    creation_ts: serverTimestamp()
+                });
+
+                count++;
+            }
+        }
+
+        utils.showAlert(adminAlert, `Successfully seeded ${count} drivers and vehicles into Firestore!`, "success");
+    } catch (err) {
+        console.error("Seeding failed:", err);
+        utils.showAlert(adminAlert, "Seeding inventory failed: " + err.message);
     }
 }
 

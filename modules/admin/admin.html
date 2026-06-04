@@ -63,9 +63,15 @@
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         
         <!-- Workspace View Switcher Tabs -->
-        <section class="mb-8 border-b border-slate-800 flex gap-6">
+        <section class="mb-8 border-b border-slate-800 flex flex-wrap gap-6">
             <button type="button" id="view-bookings-tab" class="pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200">
                 Ride Management
+            </button>
+            <button type="button" id="view-fleet-tab" class="pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200">
+                Fleet Inventory
+            </button>
+            <button type="button" id="view-drivers-tab" class="pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200">
+                Driver Registry
             </button>
             <button type="button" id="view-settings-tab" class="pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200">
                 Settings & Promo Offers
@@ -184,6 +190,171 @@
                 <p class="text-slate-500 text-sm mt-1">There are no records matching the selected status filter.</p>
             </section>
         </div>
+
+        <!-- FLEET INVENTORY VIEW PANEL -->
+        <section id="panel-fleet" class="hidden space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- 1. Add / Edit Vehicle Form -->
+                <div class="lg:col-span-1 admin-card p-6 sm:p-8 rounded-3xl space-y-6 self-start">
+                    <div>
+                        <h3 class="text-2xl font-black text-amber-500" id="fleet-form-title">Add Vehicle</h3>
+                        <p class="text-slate-400 text-xs mt-1">Register a vehicle in the active fleet inventory database.</p>
+                    </div>
+                    <form id="vehicle-form" class="space-y-4">
+                        <input type="hidden" id="vehicle-edit-id">
+                        <div>
+                            <label for="vehicle-model" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Car Model</label>
+                            <input type="text" id="vehicle-model" placeholder="E.g. Maruti Swift Dzire" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold">
+                        </div>
+                        <div>
+                            <label for="vehicle-plate" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">License Plate Number</label>
+                            <input type="text" id="vehicle-plate" placeholder="E.g. WB-02-A-1111" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold uppercase">
+                        </div>
+                        <div>
+                            <label for="vehicle-tier" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Vehicle Class Tier</label>
+                            <select id="vehicle-tier" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold appearance-none">
+                                <option value="sedan" selected>Sedan</option>
+                                <option value="suv">SUV</option>
+                                <option value="muv">MUV</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="vehicle-status" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Operational Status</label>
+                            <select id="vehicle-status" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold appearance-none">
+                                <option value="active" selected>Active</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="vehicle-driver" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Assigned Driver</label>
+                            <select id="vehicle-driver" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold appearance-none">
+                                <option value="" selected>-- None / Unassociated --</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" id="btn-save-vehicle" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                                Save Vehicle
+                            </button>
+                            <button type="button" id="btn-cancel-vehicle" class="hidden bg-slate-900 border border-slate-800 text-slate-400 font-bold py-3.5 px-4 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 2. Vehicle Catalog Table -->
+                <div class="lg:col-span-2 admin-card p-6 sm:p-8 rounded-3xl space-y-6">
+                    <div class="flex justify-between items-center flex-wrap gap-4">
+                        <div>
+                            <h3 class="text-2xl font-black text-white">Registered Fleet Inventory</h3>
+                            <p class="text-slate-400 text-xs mt-1">Real-time status tracking of all registered vehicles.</p>
+                        </div>
+                        <!-- Quick seed button if empty -->
+                        <button type="button" id="btn-seed-fleet" class="hidden bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 text-xs font-bold px-4 py-2 rounded-xl transition-all">
+                            ⚡ Seed Default Fleet
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto w-full border border-slate-800/80 rounded-2xl">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-950 border-b border-slate-800 text-slate-400 font-bold">
+                                    <th class="py-4 px-5">Model</th>
+                                    <th class="py-4 px-5">Plate Number</th>
+                                    <th class="py-4 px-5">Tier</th>
+                                    <th class="py-4 px-5">Assigned Driver</th>
+                                    <th class="py-4 px-5">Status</th>
+                                    <th class="py-4 px-5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleet-inventory-tbody" class="divide-y divide-slate-800/40 text-slate-300">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-500 italic">No vehicles registered yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DRIVER REGISTRY VIEW PANEL -->
+        <section id="panel-drivers" class="hidden space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- 1. Add / Edit Driver Form -->
+                <div class="lg:col-span-1 admin-card p-6 sm:p-8 rounded-3xl space-y-6 self-start">
+                    <div>
+                        <h3 class="text-2xl font-black text-amber-500" id="driver-form-title">Register Driver</h3>
+                        <p class="text-slate-400 text-xs mt-1">Register a driver in the operator database.</p>
+                    </div>
+                    <form id="driver-form" class="space-y-4">
+                        <input type="hidden" id="driver-edit-id">
+                        <div>
+                            <label for="driver-name" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Driver Full Name</label>
+                            <input type="text" id="driver-name" placeholder="E.g. Rajesh Kumar" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold">
+                        </div>
+                        <div>
+                            <label for="driver-phone" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Contact Phone Number</label>
+                            <input type="tel" id="driver-phone" placeholder="E.g. +918981538038" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold">
+                        </div>
+                        <div>
+                            <label for="driver-license" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Driving License Number</label>
+                            <input type="text" id="driver-license" placeholder="E.g. DL-XXXXXXXXXXXX" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold uppercase">
+                        </div>
+                        <div>
+                            <label for="driver-status" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Availability Status</label>
+                            <select id="driver-status" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold appearance-none">
+                                <option value="active" selected>Active / Available</option>
+                                <option value="sick">Sick</option>
+                                <option value="on_leave">On Leave</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="driver-vehicle" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Assigned Vehicle</label>
+                            <select id="driver-vehicle" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-2xl outline-none text-sm font-semibold appearance-none">
+                                <option value="" selected>-- None / Unassociated --</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" id="btn-save-driver" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                                Save Driver
+                            </button>
+                            <button type="button" id="btn-cancel-driver" class="hidden bg-slate-900 border border-slate-800 text-slate-400 font-bold py-3.5 px-4 rounded-2xl transition-all duration-300 transform active:scale-95 text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 2. Driver Roster Table -->
+                <div class="lg:col-span-2 admin-card p-6 sm:p-8 rounded-3xl space-y-6">
+                    <div>
+                        <h3 class="text-2xl font-black text-white">Operator Driver Registry</h3>
+                        <p class="text-slate-400 text-xs mt-1">Real-time status tracking of all registered operators.</p>
+                    </div>
+                    <div class="overflow-x-auto w-full border border-slate-800/80 rounded-2xl">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-950 border-b border-slate-800 text-slate-400 font-bold">
+                                    <th class="py-4 px-5">Name</th>
+                                    <th class="py-4 px-5">Phone Number</th>
+                                    <th class="py-4 px-5">License Number</th>
+                                    <th class="py-4 px-5">Associated Vehicle</th>
+                                    <th class="py-4 px-5">Status</th>
+                                    <th class="py-4 px-5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="driver-registry-tbody" class="divide-y divide-slate-800/40 text-slate-300">
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-slate-500 italic">No drivers registered yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- SYSTEM SETTINGS VIEW PANEL -->
         <section id="panel-settings" class="hidden space-y-8">

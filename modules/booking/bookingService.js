@@ -151,41 +151,12 @@ const bookingService = {
             const randomHex = Math.floor(1000 + Math.random() * 9000).toString();
             const bookingId = `BK-${dateStamp}-${randomHex}`;
 
-            // Simple static dummy assignments matching the selected tier (Fallback if fetch fails)
-            let assignment = {
-                driver_name: "Rajesh Kumar",
-                driver_phone: "+918981538038",
-                vehicle_number: "WB-02-A-1111"
-            };
-
-            try {
-                // Fetch the separate JSON file relatively from modules/booking/
-                const response = await fetch("./dummyFleet.json");
-                if (response.ok) {
-                    const dummyFleet = await response.json();
-                    const tier = bookingPayload.fare_details.vehicle_tier;
-                    const tierList = dummyFleet[tier] || dummyFleet.sedan;
-                    
-                    if (tierList && tierList.length > 0) {
-                        // Dynamically select a random driver from the nested array of options
-                        const randomIndex = Math.floor(Math.random() * tierList.length);
-                        assignment = tierList[randomIndex];
-                    }
-                }
-            } catch (err) {
-                console.warn("IshanCabs: Fallback to local dummy assignment due to fetch error:", err.message);
-            }
-
             const completePayload = {
                 ...bookingPayload,
                 booking_id: bookingId,
                 status: "pending_approval",
                 payment_status: "pending",
-                driver_assignment: {
-                    driver_name: assignment.driver_name,
-                    driver_phone: assignment.driver_phone,
-                    vehicle_number: assignment.vehicle_number
-                },
+                driver_assignment: null,
                 creation_ts: serverTimestamp(),
                 updated_ts: serverTimestamp()
             };
