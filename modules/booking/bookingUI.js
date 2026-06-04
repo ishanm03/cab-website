@@ -4,7 +4,7 @@ import { auth } from "../shared/firebase.js";
 import { dbService } from "../shared/dbService.js";
 import { utils } from "../shared/utils.js";
 import { routesMatrix, getPickupLocations, getDropDestinations, getRouteMetrics, terminalCoordinates } from "../shared/routesMatrix.js";
-import { bookingService } from "./bookingService.js";
+import { bookingService } from "./bookingService.js?v=20260603";
 import { authService } from "../auth/authService.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
@@ -38,6 +38,8 @@ const pickupTime = document.getElementById("pickup-time");
 const categoryRadios = document.getElementsByName("ride-category");
 const outstationDaysContainer = document.getElementById("outstation-days-container");
 const outstationDaysInput = document.getElementById("outstation-days");
+const rentalHoursContainer = document.getElementById("rental-hours-container");
+const rentalHoursSelect = document.getElementById("rental-hours");
 
 // Step 2 elements
 const routeKmBadge = document.getElementById("route-km-badge");
@@ -54,6 +56,15 @@ const summaryCategory = document.getElementById("summary-category");
 const summaryDaysRow = document.getElementById("summary-days-row");
 const summaryDays = document.getElementById("summary-days");
 const summaryTier = document.getElementById("summary-tier");
+const summaryBaseFare = document.getElementById("summary-base-fare");
+const summaryDiscountRow = document.getElementById("summary-discount-row");
+const summaryPromoCodeName = document.getElementById("summary-promo-code-name");
+const summaryDiscountAmount = document.getElementById("summary-discount-amount");
+const promoCodeInput = document.getElementById("promo-code-input");
+const btnApplyPromo = document.getElementById("btn-apply-promo");
+const promoStatusMsg = document.getElementById("promo-status-msg");
+const availableOffersContainer = document.getElementById("available-offers-container");
+const offersChipsList = document.getElementById("offers-chips-list");
 const summaryGrandTotal = document.getElementById("summary-grand-total");
 const btnBackTo2 = document.getElementById("btn-back-to-2");
 const btnConfirmBooking = document.getElementById("btn-confirm-booking");
@@ -75,7 +86,8 @@ let currentRouteData = {
     polyline: null
 };
 let selectedVehicleTier = null;
-let selectedVehicleFare = 0;
+let selectedVehicleFare = 0; // Represents base fare before discounts
+let appliedPromo = null; // { code: string, discount: number }
 
 // Map & Geocoding State Variables
 const bookingMapWrapper = document.getElementById("booking-map-wrapper");
@@ -138,6 +150,9 @@ function initBookingUI() {
 
     // 11. Final Confirm booking & WhatsApp redirect
     btnConfirmBooking.addEventListener("click", handleFinalConfirm);
+
+    // 12. Apply Promo Code
+    btnApplyPromo.addEventListener("click", handleApplyPromo);
 }
 
 // Redirect unauthenticated sessions
@@ -278,7 +293,11 @@ function initOrUpdateMap() {
     }
 
     // Resolve or default drop coordinates
-    if (dropVal === "Custom Location") {
+    const category = document.querySelector('input[name="ride-category"]:checked')?.value || "local";
+    if (category === "rental") {
+        mapDropCoords = null;
+        mapDropAddress = "";
+    } else if (dropVal === "Custom Location") {
         if (!mapDropCoords) {
             mapDropCoords = [22.5726, 88.3739];
             mapDropAddress = "Custom Drop Location";
@@ -505,10 +524,11 @@ function getHaversineDistance(coords1, coords2) {
     return Math.ceil(R * c * 1.3); // Apply 30% routing overhead to approximate actual driving distance
 }
 
-// Shows/Hides outstation days
+// Shows/Hides outstation days and rental hours
 function handleCategoryChange(e) {
     utils.hideElement(bookingAlert);
     const category = e.target.value;
+    
     if (category === "outstation") {
         utils.showElement(outstationDaysContainer);
         outstationDaysInput.required = true;
@@ -517,6 +537,25 @@ function handleCategoryChange(e) {
         outstationDaysInput.required = false;
         outstationDaysInput.value = 1;
     }
+
+    if (category === "rental") {
+        utils.showElement(rentalHoursContainer);
+        rentalHoursSelect.required = true;
+        
+        utils.hideElement(dropSelect.parentElement);
+        dropSelect.required = false;
+        dropSelect.value = "";
+    } else {
+        utils.hideElement(rentalHoursContainer);
+        rentalHoursSelect.required = false;
+        
+        utils.showElement(dropSelect.parentElement);
+        if (pickupSelect.value) {
+            dropSelect.required = true;
+        }
+    }
+
+    toggleMapVisibility();
 }
 
 // Restricts calendar inputs to require minimum 2 hours lead scheduling time
@@ -623,18 +662,22 @@ async function handleStep1Submit(e) {
         pickupCoords = terminalCoordinates[pickup];
     }
 
-    if (drop === "Custom Location") {
-        if (!mapDropCoords) {
-            utils.showAlert(bookingAlert, "Please select a custom drop location on the map.");
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            return;
+    if (category === "rental") {
+        dropCoords = null;
+    } else {
+        if (drop === "Custom Location") {
+            if (!mapDropCoords) {
+                utils.showAlert(bookingAlert, "Please select a custom drop location on the map.");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            dropCoords = mapDropCoords;
+        } else if (drop && terminalCoordinates[drop]) {
+            dropCoords = terminalCoordinates[drop];
         }
-        dropCoords = mapDropCoords;
-    } else if (drop && terminalCoordinates[drop]) {
-        dropCoords = terminalCoordinates[drop];
     }
 
-    if (!pickupCoords || !dropCoords) {
+    if (!pickupCoords || (category !== "rental" && !dropCoords)) {
         utils.showAlert(bookingAlert, "Pickup and Destination coordinates could not be resolved.");
         return;
     }
@@ -644,29 +687,34 @@ async function handleStep1Submit(e) {
     let distanceKm = 0;
     let polyline = null;
 
-    try {
-        // Query OSRM
-        const routeData = await fetchOSRMRoute(pickupCoords, dropCoords);
-        distanceKm = Math.round(routeData.distance / 1000) || 1;
-        const coords = routeData.geometry.coordinates; // array of [lng, lat]
-        polyline = coords.map(coord => [coord[1], coord[0]]); // convert to [lat, lng]
-    } catch (err) {
-        console.warn("Routing API failed, using fallback metrics:", err.message);
-        
-        // Fallback to Haversine distance
-        distanceKm = getHaversineDistance(pickupCoords, dropCoords);
-        polyline = [pickupCoords, dropCoords]; // Straight-line polyline fallback
+    if (category === "rental") {
+        distanceKm = 0;
+        polyline = null;
+    } else {
+        try {
+            // Query OSRM
+            const routeData = await fetchOSRMRoute(pickupCoords, dropCoords);
+            distanceKm = Math.round(routeData.distance / 1000) || 1;
+            const coords = routeData.geometry.coordinates; // array of [lng, lat]
+            polyline = coords.map(coord => [coord[1], coord[0]]); // convert to [lat, lng]
+        } catch (err) {
+            console.warn("Routing API failed, using fallback metrics:", err.message);
+            
+            // Fallback to Haversine distance
+            distanceKm = getHaversineDistance(pickupCoords, dropCoords);
+            polyline = [pickupCoords, dropCoords]; // Straight-line polyline fallback
+        }
     }
 
     // Check if flat metrics are applicable (only if BOTH are NOT custom and we have a matrix match)
     let metrics = null;
-    if (pickup !== "Custom Location" && drop !== "Custom Location") {
+    if (category !== "rental" && pickup !== "Custom Location" && drop !== "Custom Location") {
         metrics = getRouteMetrics(pickup, drop);
     }
 
     // Determine resolved pickup and drop display names
     const resolvedPickupName = pickup === "Custom Location" ? (mapPickupAddress || "Custom Pickup Location") : pickup;
-    const resolvedDropName = drop === "Custom Location" ? (mapDropAddress || "Custom Drop Location") : drop;
+    const resolvedDropName = category === "rental" ? "Rental Service (No Drop)" : (drop === "Custom Location" ? (mapDropAddress || "Custom Drop Location") : drop);
 
     // Save configuration parameters globally
     currentRouteData = {
@@ -676,7 +724,8 @@ async function handleStep1Submit(e) {
         timeString: timeVal,
         category: category,
         days: days,
-        km: metrics ? metrics.km : distanceKm,
+        hours: category === "rental" ? parseInt(rentalHoursSelect.value) : 0,
+        km: category === "rental" ? 0 : (metrics ? metrics.km : distanceKm),
         flatMetrics: metrics,
         pickupCoords: pickupCoords,
         dropCoords: dropCoords,
@@ -688,6 +737,7 @@ async function handleStep1Submit(e) {
 
     // Process rates and time-aware inventory availability check for each category (Sedan, SUV, MUV)
     try {
+        const activeRates = await bookingService.fetchRates();
         const tiers = ["sedan", "suv", "muv"];
         
         for (const tier of tiers) {
@@ -696,7 +746,7 @@ async function handleStep1Submit(e) {
             const soldOutOverlay = card.querySelector(".sold-out-overlay");
 
             // Calculate fare dynamically
-            const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics);
+            const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics, currentRouteData.hours, activeRates);
             fareDisplay.textContent = `₹${fare.toLocaleString("en-IN")}`;
             card.dataset.computedFare = fare;
 
@@ -793,6 +843,39 @@ function navigateBackTo2() {
     updateProgressSteps(2);
 }
 
+async function loadVisiblePromoChips() {
+    utils.hideElement(availableOffersContainer);
+    offersChipsList.innerHTML = "";
+    
+    try {
+        const promos = await bookingService.fetchVisiblePromos();
+        // Filter by eligibility (estimated base fare >= min threshold)
+        const eligiblePromos = promos.filter(p => selectedVehicleFare >= (parseFloat(p.min_fare_threshold) || 0));
+        
+        if (eligiblePromos.length > 0) {
+            eligiblePromos.forEach(p => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                // Glassmorphic chip styling
+                btn.className = "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 font-bold px-3 py-1.5 rounded-xl text-xs transition-all duration-200 transform active:scale-95 cursor-pointer flex items-center gap-1.5";
+                
+                const typeLabel = p.discount_type === "percentage" ? `${p.discount_value}%` : `₹${p.discount_value}`;
+                btn.textContent = `${p.code} (Save ${typeLabel})`;
+                
+                btn.addEventListener("click", () => {
+                    promoCodeInput.value = p.code;
+                    handleApplyPromo();
+                });
+                
+                offersChipsList.appendChild(btn);
+            });
+            utils.showElement(availableOffersContainer);
+        }
+    } catch (err) {
+        console.error("Failed to load visible promo chips:", err);
+    }
+}
+
 // Switches from Step 2 to checkout summary panel (Step 3)
 function navigateToStep3() {
     if (!selectedVehicleTier) return;
@@ -804,10 +887,27 @@ function navigateToStep3() {
     summaryDatetime.textContent = `${currentRouteData.dateString} at ${currentRouteData.timeString}`;
     summaryCategory.textContent = currentRouteData.category.charAt(0).toUpperCase() + currentRouteData.category.slice(1);
     summaryTier.textContent = selectedVehicleTier.toUpperCase();
+    
+    // Set base fare & reset promo state
+    summaryBaseFare.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
     summaryGrandTotal.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
+    appliedPromo = null;
+    promoCodeInput.value = "";
+    utils.hideElement(summaryDiscountRow);
+    utils.hideElement(promoStatusMsg);
+    promoStatusMsg.className = "text-xs font-semibold text-center hidden";
+    promoStatusMsg.textContent = "";
+
+    // Load visible offers for rider selection
+    loadVisiblePromoChips();
 
     if (currentRouteData.category === "outstation") {
+        summaryDaysRow.firstElementChild.textContent = "Outstation Duration";
         summaryDays.textContent = `${currentRouteData.days} Day(s)`;
+        utils.showElement(summaryDaysRow);
+    } else if (currentRouteData.category === "rental") {
+        summaryDaysRow.firstElementChild.textContent = "Rental Duration";
+        summaryDays.textContent = `${currentRouteData.hours} Hour(s)`;
         utils.showElement(summaryDaysRow);
     } else {
         utils.hideElement(summaryDaysRow);
@@ -816,6 +916,60 @@ function navigateToStep3() {
     utils.hideElement(panelStep2);
     utils.showElement(panelStep3);
     updateProgressSteps(3);
+}
+
+async function handleApplyPromo() {
+    utils.hideElement(promoStatusMsg);
+    const code = promoCodeInput.value.trim();
+    if (!code) {
+        promoStatusMsg.textContent = "Please enter a promo code.";
+        promoStatusMsg.className = "text-xs font-semibold text-center mt-2 text-rose-500 block";
+        utils.showElement(promoStatusMsg);
+        return;
+    }
+    
+    btnApplyPromo.disabled = true;
+    btnApplyPromo.textContent = "Applying...";
+    
+    try {
+        const result = await bookingService.verifyPromoCode(code, selectedVehicleFare);
+        if (result.valid) {
+            appliedPromo = {
+                code: result.code,
+                discount: result.discount
+            };
+            
+            // Show discount line in billing breakdown
+            summaryPromoCodeName.textContent = result.code;
+            summaryDiscountAmount.textContent = `-₹${result.discount.toLocaleString("en-IN")}`;
+            utils.showElement(summaryDiscountRow);
+            
+            // Calculate final grand total
+            const finalFare = selectedVehicleFare - result.discount;
+            summaryGrandTotal.textContent = `₹${finalFare.toLocaleString("en-IN")}`;
+            
+            // Show status success message
+            promoStatusMsg.textContent = result.message;
+            promoStatusMsg.className = "text-xs font-semibold text-center mt-2 text-emerald-500 block";
+            utils.showElement(promoStatusMsg);
+        } else {
+            appliedPromo = null;
+            utils.hideElement(summaryDiscountRow);
+            summaryGrandTotal.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
+            
+            promoStatusMsg.textContent = result.message;
+            promoStatusMsg.className = "text-xs font-semibold text-center mt-2 text-rose-500 block";
+            utils.showElement(promoStatusMsg);
+        }
+    } catch (err) {
+        console.error("Error applying promo:", err);
+        promoStatusMsg.textContent = "Failed to apply promo code.";
+        promoStatusMsg.className = "text-xs font-semibold text-center mt-2 text-rose-500 block";
+        utils.showElement(promoStatusMsg);
+    } finally {
+        btnApplyPromo.disabled = false;
+        btnApplyPromo.textContent = "Apply";
+    }
 }
 
 // Final execution loop (saves to Firestore, then opens WhatsApp redirect window)
@@ -840,6 +994,7 @@ async function handleFinalConfirm() {
             pickup_date: currentRouteData.dateString,
             pickup_time: currentRouteData.timeString,
             outstation_days: currentRouteData.category === "outstation" ? currentRouteData.days : null,
+            rental_hours: currentRouteData.category === "rental" ? currentRouteData.hours : null,
             pickup_coords: currentRouteData.pickupCoords || null,
             drop_coords: currentRouteData.dropCoords || null,
             route_polyline: currentRouteData.polyline ? JSON.stringify(currentRouteData.polyline) : null
@@ -847,7 +1002,10 @@ async function handleFinalConfirm() {
         fare_details: {
             vehicle_tier: selectedVehicleTier,
             estimated_km: currentRouteData.km,
-            estimated_fare: selectedVehicleFare
+            base_fare: selectedVehicleFare,
+            discount_amount: appliedPromo ? appliedPromo.discount : 0,
+            promo_code: appliedPromo ? appliedPromo.code : null,
+            estimated_fare: appliedPromo ? (selectedVehicleFare - appliedPromo.discount) : selectedVehicleFare
         }
     };
 

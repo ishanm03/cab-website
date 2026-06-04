@@ -5,6 +5,7 @@ import {
     collection, 
     addDoc, 
     setDoc, 
+    getDoc,
     doc, 
     query, 
     where, 
@@ -21,36 +22,46 @@ const DEFAULT_FLEET_SIZES = {
 
 // Rate matrix configurations for custom computations (INR)
 const RATE_CONFIG = {
-    sedan: { rate_per_km: 12.00, driver_allowance_per_day: 300.00 },
-    suv:   { rate_per_km: 15.00, driver_allowance_per_day: 400.00 },
-    muv:   { rate_per_km: 18.00, driver_allowance_per_day: 500.00 }
+    sedan: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
+    suv:   { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
+    muv:   { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
 };
 
 const bookingService = {
     /**
      * Calculates the estimated grand total fare for a given trip configuration
-     * @param {string} rideType - "local" | "intercity" | "outstation"
+     * @param {string} rideType - "local" | "intercity" | "outstation" | "rental"
      * @param {number} distance - Distance in kilometers (from routesMatrix)
      * @param {number} days - Outstation duration (in days)
      * @param {string} tier - "sedan" | "suv" | "muv"
      * @param {object} flatMetrics - Flat metrics from routeMatrix if available
+     * @param {number} hours - Rental duration (in hours)
+     * @param {object} activeRates - Dynamic rates setting from Firestore
      * @returns {number} Estimated total fare in INR
      */
-    calculateFare(rideType, distance, days, tier, flatMetrics) {
+    calculateFare(rideType, distance, days, tier, flatMetrics, hours = 0, activeRates = null) {
         // Fallback checks
         const actualDays = Math.max(1, parseInt(days) || 1);
         const actualDistance = parseFloat(distance) || 0;
+        const actualHours = Math.max(1, parseInt(hours) || 1);
         
-        // 1. If Local / Intercity and flat-rates are mapped in our routesMatrix, use them!
+        const rates = activeRates || RATE_CONFIG;
+        const config = rates[tier] || RATE_CONFIG[tier] || RATE_CONFIG.sedan;
+        
+        // 1. Hourly rental calculations
+        if (rideType === "rental") {
+            const hourlyRate = config.rate_per_hour || (tier === "sedan" ? 150 : (tier === "suv" ? 200 : 250));
+            return Math.round(hourlyRate * actualHours);
+        }
+
+        // 2. If Local / Intercity and flat-rates are mapped in our routesMatrix, use them!
         if ((rideType === "local" || rideType === "intercity") && flatMetrics) {
             if (tier === "sedan" && flatMetrics.base_fare_sedan) return flatMetrics.base_fare_sedan;
             if (tier === "suv" && flatMetrics.base_fare_suv) return flatMetrics.base_fare_suv;
             if (tier === "muv") return (flatMetrics.base_fare_suv || 1000) * 1.25; // MUV is 25% premium over SUV flat-rate
         }
 
-        // 2. Fallback or Outstation computations (Round-Trip pricing based on West Bengal standard guidelines)
-        const config = RATE_CONFIG[tier] || RATE_CONFIG.sedan;
-        
+        // 3. Fallback or Outstation computations (Round-Trip pricing based on West Bengal standard guidelines)
         if (rideType === "outstation") {
             // Outstation standard: Round-trip distance (pickup to drop to pickup)
             const roundTripDistance = actualDistance * 2;
@@ -67,7 +78,7 @@ const bookingService = {
         } else {
             // Fallback for custom local point-to-point without flat-fares
             const distanceCost = actualDistance * config.rate_per_km;
-            const baseCost = tier === "sedan" ? 300 : (tier === "suv" ? 500 : 700);
+            const baseCost = config.base_cost || (tier === "sedan" ? 300 : (tier === "suv" ? 500 : 700));
             return Math.round(baseCost + distanceCost);
         }
     },
@@ -211,7 +222,127 @@ ${booking.trip_details.outstation_days ? `*Duration:* ${booking.trip_details.out
 Please confirm driver and vehicle allocation details. Thank you!`;
 
         return `https://wa.me/${supportPhone}?text=${encodeURIComponent(text)}`;
+    },
+
+    /**
+     * Fetches dynamic rates from Firestore settings/rates
+     * @returns {Promise<object>} Map of rates per vehicle tier
+     */
+    async fetchRates() {
+        if (!db) {
+            console.warn("IshanCabs: Firestore not initialized. Using default rates.");
+            return RATE_CONFIG;
+        }
+        try {
+            const docRef = doc(db, "settings", "rates");
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data && data.rates) {
+                    return data.rates;
+                }
+            }
+            return RATE_CONFIG;
+        } catch (error) {
+            console.error("IshanCabs: Error fetching rates settings:", error);
+            return RATE_CONFIG;
+        }
+    },
+
+    /**
+     * Updates dynamic rates in Firestore settings/rates
+     * @param {object} newRates - Map of rates per vehicle tier
+     * @returns {Promise<void>}
+     */
+    async updateRates(newRates) {
+        if (!db) throw new Error("Firestore not initialized.");
+        const docRef = doc(db, "settings", "rates");
+        await setDoc(docRef, { rates: newRates });
+    },
+
+    /**
+     * Fetches active promo codes that are marked to be visible to customers
+     * @returns {Promise<Array>} List of visible promo offers
+     */
+    async fetchVisiblePromos() {
+        if (!db) return [];
+        try {
+            const offersQuery = query(
+                collection(db, "offers"),
+                where("status", "==", "active"),
+                where("visible_to_customer", "==", true)
+             );
+             const snap = await getDocs(offersQuery);
+             const list = [];
+             snap.forEach(docSnap => {
+                 list.push(docSnap.data());
+             });
+             return list;
+        } catch (error) {
+            console.error("IshanCabs: Error fetching visible promos:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Verifies a promo code against active offers in Firestore
+     * @param {string} code - The promo code to check
+     * @param {number} baseFare - Current booking base fare
+     * @returns {Promise<object>} Validation result: { valid: boolean, discount: number, message: string }
+     */
+    async verifyPromoCode(code, baseFare) {
+        if (!db) {
+            return { valid: false, discount: 0, message: "Database not connected." };
+        }
+        try {
+            const cleanCode = code.trim().toUpperCase();
+            if (!cleanCode) {
+                return { valid: false, discount: 0, message: "Please enter a promo code." };
+            }
+            const docRef = doc(db, "offers", cleanCode);
+            const docSnap = await getDoc(docRef);
+            
+            if (!docSnap.exists()) {
+                return { valid: false, discount: 0, message: "Invalid promo code." };
+            }
+            
+            const offer = docSnap.data();
+            if (offer.status !== "active") {
+                return { valid: false, discount: 0, message: "This promo code is no longer active." };
+            }
+            
+            const minThreshold = parseFloat(offer.min_fare_threshold) || 0;
+            if (baseFare < minThreshold) {
+                return { 
+                    valid: false, 
+                    discount: 0, 
+                    message: `Minimum fare of ₹${minThreshold.toLocaleString("en-IN")} required to use this promo.` 
+                };
+            }
+            
+            let discount = 0;
+            const val = parseFloat(offer.discount_value) || 0;
+            if (offer.discount_type === "flat") {
+                discount = val;
+            } else if (offer.discount_type === "percentage") {
+                discount = Math.round((baseFare * val) / 100);
+            }
+            
+            // Limit discount to not exceed baseFare
+            discount = Math.min(discount, baseFare);
+            
+            return {
+                valid: true,
+                discount: discount,
+                code: cleanCode,
+                message: `Promo code ${cleanCode} applied successfully!`
+            };
+        } catch (error) {
+            console.error("IshanCabs: Error verifying promo code:", error);
+            return { valid: false, discount: 0, message: "Error verifying promo code. Please try again." };
+        }
     }
 };
 
 export { bookingService };
+

@@ -144,7 +144,10 @@ function renderActivityList() {
         let statusText = "Requested";
         let badgeClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
         if (booking.status === "confirmed") {
-            statusText = "On-Going";
+            statusText = "Confirmed";
+            badgeClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
+        } else if (booking.status === "active") {
+            statusText = `<span class="inline-flex items-center"><span class="relative flex h-2 w-2 mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>On-Going</span>`;
             badgeClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
         } else if (booking.status === "completed") {
             statusText = "Completed";
@@ -204,7 +207,7 @@ function renderActivityList() {
                 </div>
 
                 <!-- Driver Assignment details -->
-                ${(booking.status === "confirmed" || booking.status === "completed") && booking.driver_assignment ? `
+                ${(booking.status === "confirmed" || booking.status === "active" || booking.status === "completed") && booking.driver_assignment ? `
                 <div class="bg-slate-900/40 border border-slate-800/60 p-3 rounded-xl">
                     <span class="text-[9px] font-bold text-slate-500 tracking-wider block uppercase mb-1.5">Your Allocated Driver & Car</span>
                     <div class="grid grid-cols-3 gap-2 text-slate-300">
@@ -233,8 +236,13 @@ function renderActivityList() {
                 ` : ""}
 
                 <!-- Active On-Going Wait Notification -->
-                ${booking.status === "confirmed" ? `
+                ${booking.status === "active" ? `
                 <p class="text-[10px] text-slate-500 text-center italic py-1">Ride is ongoing. Once completed, your feedback review form will unlock.</p>
+                ` : ""}
+
+                <!-- Confirmed Wait Notification -->
+                ${booking.status === "confirmed" ? `
+                <p class="text-[10px] text-slate-500 text-center italic py-1">Your booking is confirmed! Driver details have been allocated above. The ride will start shortly.</p>
                 ` : ""}
 
                 <!-- Requested Wait Notification -->
@@ -432,11 +440,13 @@ function initRiderMap(booking) {
     if (!pickupCoords && booking.trip_details.pickup_location) {
         pickupCoords = terminalCoordinates[booking.trip_details.pickup_location];
     }
-    if (!dropCoords && booking.trip_details.drop_location) {
-        dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+    if (booking.trip_details.ride_type !== "rental") {
+        if (!dropCoords && booking.trip_details.drop_location) {
+            dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+        }
     }
 
-    if (!pickupCoords || !dropCoords) {
+    if (!pickupCoords || (booking.trip_details.ride_type !== "rental" && !dropCoords)) {
         console.warn("Could not find coordinates for booking:", booking.id);
         utils.hideElement(mapContainer);
         return;
@@ -460,28 +470,35 @@ function initRiderMap(booking) {
             maxZoom: 19
         }).addTo(map);
 
-        // Plot Pickup and Drop markers
+        // Plot Pickup marker
         const pickupMarker = L.marker(pickupCoords, { title: "Pickup Location" }).addTo(map);
-        const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
-
-        // Bind simple popups
         pickupMarker.bindPopup(`<b>Pickup:</b> ${booking.trip_details.pickup_location}`);
-        dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
 
-        // Plot polyline
-        if (polyline && polyline.length > 0) {
-            L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+        if (booking.trip_details.ride_type !== "rental") {
+            // Plot Drop marker
+            const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
+            dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
+
+            // Plot polyline
+            if (polyline && polyline.length > 0) {
+                L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+            } else {
+                // Draw straight-line fallback
+                L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+            }
+
+            // Adjust bounds
+            const group = new L.featureGroup([pickupMarker, dropMarker]);
+            setTimeout(() => {
+                map.invalidateSize();
+                map.fitBounds(group.getBounds().pad(0.15));
+            }, 100);
         } else {
-            // Draw straight-line fallback
-            L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+            setTimeout(() => {
+                map.invalidateSize();
+                map.setView(pickupCoords, 14);
+            }, 100);
         }
-
-        // Adjust bounds
-        const group = new L.featureGroup([pickupMarker, dropMarker]);
-        setTimeout(() => {
-            map.invalidateSize();
-            map.fitBounds(group.getBounds().pad(0.15));
-        }, 100);
 
         riderMaps[booking.id] = map;
     } catch (err) {

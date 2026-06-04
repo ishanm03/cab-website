@@ -12,6 +12,10 @@ import {
     onSnapshot, 
     doc, 
     updateDoc,
+    getDoc,
+    getDocs,
+    setDoc,
+    deleteDoc,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -22,12 +26,14 @@ const btnAdminLogout = document.getElementById("btn-admin-logout");
 // Stats Counters
 const statTotal = document.getElementById("stat-total");
 const statRequested = document.getElementById("stat-requested");
+const statConfirmed = document.getElementById("stat-confirmed");
 const statOngoing = document.getElementById("stat-ongoing");
 const statCompleted = document.getElementById("stat-completed");
 
 // Tabs
 const tabAll = document.getElementById("tab-all");
 const tabReq = document.getElementById("tab-req");
+const tabConf = document.getElementById("tab-conf");
 const tabOng = document.getElementById("tab-ong");
 const tabComp = document.getElementById("tab-comp");
 const tabRej = document.getElementById("tab-rej");
@@ -54,10 +60,45 @@ const rejectBookingId = document.getElementById("reject-booking-id");
 const rejectReason = document.getElementById("reject-reason");
 const btnCloseReject = document.getElementById("btn-close-reject");
 
+// Workspace View Switchers
+const viewBookingsTab = document.getElementById("view-bookings-tab");
+const viewSettingsTab = document.getElementById("view-settings-tab");
+const panelBookings = document.getElementById("panel-bookings");
+const panelSettings = document.getElementById("panel-settings");
+
+// Fares Configuration Form
+const faresMatrixForm = document.getElementById("fares-matrix-form");
+const fareSedanBase = document.getElementById("fare-sedan-base");
+const fareSedanKm = document.getElementById("fare-sedan-km");
+const fareSedanHour = document.getElementById("fare-sedan-hour");
+const fareSedanAllowance = document.getElementById("fare-sedan-allowance");
+
+const fareSuvBase = document.getElementById("fare-suv-base");
+const fareSuvKm = document.getElementById("fare-suv-km");
+const fareSuvHour = document.getElementById("fare-suv-hour");
+const fareSuvAllowance = document.getElementById("fare-suv-allowance");
+
+const fareMuvBase = document.getElementById("fare-muv-base");
+const fareMuvKm = document.getElementById("fare-muv-km");
+const fareMuvHour = document.getElementById("fare-muv-hour");
+const fareMuvAllowance = document.getElementById("fare-muv-allowance");
+
+// Promo Offer Form
+const promoCodeForm = document.getElementById("promo-code-form");
+const promoCodeInput = document.getElementById("promo-code");
+const promoTypeSelect = document.getElementById("promo-type");
+const promoValueInput = document.getElementById("promo-value");
+const promoMinFareInput = document.getElementById("promo-min-fare");
+const promoVisibleInput = document.getElementById("promo-visible");
+const activePromosTbody = document.getElementById("active-promos-tbody");
+
+// Manual Discount Override inside Approve Modal
+const approveDiscountOverride = document.getElementById("approve-discount-override");
+
 // State Variables
 let bookingsData = [];
 let rosterData = {};
-let currentStatusFilter = "all"; // "all" | "pending_approval" | "confirmed" | "completed" | "rejected"
+let currentStatusFilter = "all"; // "all" | "pending_approval" | "confirmed" | "active" | "completed" | "rejected"
 let firebaseAuthUnsubscribe = null;
 let firestoreUnsubscribe = null;
 let adminMaps = {}; // booking.id -> Leaflet map instance
@@ -97,6 +138,13 @@ function initAdminUI() {
 
     // 7. Bind Status Filtering Tabs
     setupFilterTabs();
+
+    // 8. Bind View Switchers
+    setupViewSwitchers();
+
+    // 9. Bind dynamic settings & coupon forms
+    faresMatrixForm.addEventListener("submit", handleFaresFormSubmit);
+    promoCodeForm.addEventListener("submit", handlePromoFormSubmit);
 }
 
 // Security: Force rerouting if user is not authorized as Admin
@@ -110,6 +158,10 @@ async function handleAdminSessionChange(user) {
         
         // Start streaming bookings data in real-time
         startBookingsSnapshotListener();
+
+        // Prefetch settings and promo configuration arrays
+        loadFaresMatrix();
+        loadPromoOffers();
     } else {
         // Not logged in or not admin -> block access
         console.warn("IshanCabs: Unauthorized admin dashboard access attempt.");
@@ -211,11 +263,13 @@ function handleRosterSelectionChange() {
 function updateStatsCounters() {
     let total = bookingsData.length;
     let requested = bookingsData.filter(b => b.status === "pending_approval").length;
-    let ongoing = bookingsData.filter(b => b.status === "confirmed").length;
+    let confirmed = bookingsData.filter(b => b.status === "confirmed").length;
+    let ongoing = bookingsData.filter(b => b.status === "active").length;
     let completed = bookingsData.filter(b => b.status === "completed").length;
 
     statTotal.textContent = total;
     statRequested.textContent = requested;
+    statConfirmed.textContent = confirmed;
     statOngoing.textContent = ongoing;
     statCompleted.textContent = completed;
 }
@@ -225,18 +279,22 @@ function setupFilterTabs() {
     const tabs = [
         { btn: tabAll, filter: "all" },
         { btn: tabReq, filter: "pending_approval" },
-        { btn: tabOng, filter: "confirmed" },
+        { btn: tabConf, filter: "confirmed" },
+        { btn: tabOng, filter: "active" },
         { btn: tabComp, filter: "completed" },
         { btn: tabRej, filter: "rejected" }
     ];
 
     tabs.forEach(tab => {
+        if (!tab.btn) return;
         tab.btn.addEventListener("click", () => {
             // Swap visual tab active headers
             tabs.forEach(t => {
-                t.btn.className = "flex-1 min-w-[80px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200";
+                if (t.btn) {
+                    t.btn.className = "flex-1 min-w-[60px] py-2.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-200";
+                }
             });
-            tab.btn.className = "flex-1 min-w-[80px] py-2.5 text-xs font-bold rounded-xl text-amber-500 bg-slate-900 transition-all duration-200";
+            tab.btn.className = "flex-1 min-w-[60px] py-2.5 text-xs font-bold rounded-xl text-amber-500 bg-slate-900 transition-all duration-200";
 
             currentStatusFilter = tab.filter;
             renderBookings();
@@ -272,7 +330,10 @@ function renderBookings() {
         let statusText = "Requested";
         let badgeClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
         if (booking.status === "confirmed") {
-            statusText = "On-Going";
+            statusText = "Confirmed";
+            badgeClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
+        } else if (booking.status === "active") {
+            statusText = `<span class="inline-flex items-center"><span class="relative flex h-2 w-2 mr-1.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>On-Going</span>`;
             badgeClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
         } else if (booking.status === "completed") {
             statusText = "Completed";
@@ -285,6 +346,20 @@ function renderBookings() {
         const dateStr = booking.trip_details.pickup_date || "--";
         const timeStr = booking.trip_details.pickup_time || "--";
         const creationDate = booking.creation_ts ? new Date(booking.creation_ts.seconds * 1000).toLocaleString() : "Recently Added";
+
+        // Compute fare details with discounts/promos
+        const finalFare = booking.fare_details.estimated_fare;
+        const baseFare = typeof booking.fare_details.base_fare === "number" ? booking.fare_details.base_fare : finalFare;
+        const discount = booking.fare_details.discount_amount || 0;
+        const promo = booking.fare_details.promo_code;
+
+        let amountHtml = `${booking.fare_details.estimated_km} km • ₹${finalFare.toLocaleString("en-IN")}/-`;
+        if (discount > 0) {
+            amountHtml = `
+                <span class="block">${booking.fare_details.estimated_km} km • ₹${finalFare.toLocaleString("en-IN")}/-</span>
+                <span class="text-[9px] text-slate-400 font-normal block mt-0.5 leading-tight">Base: ₹${baseFare.toLocaleString("en-IN")} | Promo: ${promo} (-₹${discount.toLocaleString("en-IN")})</span>
+            `;
+        }
 
         // HTML code structure for each card
         card.innerHTML = `
@@ -324,7 +399,7 @@ function renderBookings() {
                     </div>
                     <div>
                         <span class="text-[10px] text-slate-500 block">KM & Amount</span>
-                        <span class="font-semibold text-amber-500 block mt-0.5">${booking.fare_details.estimated_km} km • ₹${booking.fare_details.estimated_fare}/-</span>
+                        <span class="font-semibold text-amber-500 block mt-0.5">${amountHtml}</span>
                     </div>
                 </div>
 
@@ -335,7 +410,7 @@ function renderBookings() {
                 </div>
 
                 <!-- Driver Allocation Panel -->
-                ${(booking.status === "confirmed" || booking.status === "completed") && booking.driver_assignment ? `
+                ${(booking.status === "confirmed" || booking.status === "active" || booking.status === "completed") && booking.driver_assignment ? `
                 <div class="bg-slate-950/60 border border-slate-800/60 p-3 rounded-2xl text-xs mt-3">
                     <span class="text-[10px] font-bold text-slate-500 tracking-wider block uppercase mb-1.5">Assigned Fleet</span>
                     <div class="grid grid-cols-2 gap-2 text-slate-300">
@@ -396,12 +471,41 @@ function renderBookings() {
                     </button>
                 ` : ""}
 
-                ${booking.status === "confirmed" ? `
+                ${booking.status === "confirmed" ? (() => {
+                    const pickupDate = booking.trip_details.pickup_date;
+                    const pickupTime = booking.trip_details.pickup_time;
+                    let hasPassed = true;
+                    if (pickupDate && pickupTime) {
+                        const pickupDateTime = new Date(`${pickupDate}T${pickupTime}`);
+                        if (!isNaN(pickupDateTime.getTime())) {
+                            hasPassed = new Date() >= pickupDateTime;
+                        }
+                    }
+                    return `
+                        <button type="button" 
+                            class="btn-start flex-1 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95 shadow-md ${
+                                hasPassed 
+                                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/10 cursor-pointer" 
+                                : "bg-slate-900 text-slate-600 border border-slate-800/80 cursor-not-allowed"
+                            }" 
+                            data-id="${booking.id}"
+                            ${hasPassed ? "" : "disabled"}
+                            title="${hasPassed ? "Click to start the ride" : "Ride cannot be started before the pickup time"}"
+                        >
+                            ${hasPassed ? "Start Ride" : "Start Ride (Locked)"}
+                        </button>
+                        <button type="button" class="btn-approve flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200" data-id="${booking.id}">
+                            Reassign Driver
+                        </button>
+                    `;
+                })() : ""}
+
+                ${booking.status === "active" ? `
                     <button type="button" class="btn-complete flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95 shadow-md shadow-amber-500/10" data-id="${booking.id}">
                         Mark Completed
                     </button>
-                    <button type="button" class="btn-approve flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200" data-id="${booking.id}">
-                        Reassign Driver
+                    <button type="button" class="btn-text-rider flex-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-amber-400 text-xs font-bold py-3 px-3 rounded-xl transition-all duration-200 transform active:scale-95" data-id="${booking.id}">
+                        Text Rider
                     </button>
                 ` : ""}
 
@@ -440,6 +544,7 @@ function bindCardActionButtonEvents() {
             approveDriverName.value = booking.driver_assignment?.driver_name || "";
             approveDriverPhone.value = booking.driver_assignment?.driver_phone || "";
             approveVehicleNumber.value = booking.driver_assignment?.vehicle_number || "";
+            approveDiscountOverride.value = booking.fare_details?.discount_amount || "";
 
             utils.showElement(approvalModal);
         });
@@ -474,6 +579,29 @@ function bindCardActionButtonEvents() {
                     utils.showAlert(adminAlert, `Booking ${bookingId} marked completed successfully!`, "success");
                 } catch (error) {
                     console.error("IshanCabs: Failed to complete ride", error);
+                    utils.showAlert(adminAlert, "Status update failed: " + error.message);
+                }
+            }
+        });
+    });
+
+    // 3.5. Start Ride trigger
+    const startButtons = document.querySelectorAll(".btn-start");
+    startButtons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const bookingId = btn.getAttribute("data-id");
+            const confirmStart = confirm(`Are you sure you want to start booking ${bookingId}? This will change the status to On-Going.`);
+            if (confirmStart) {
+                utils.showAlert(adminAlert, "Starting ride...", "success");
+                try {
+                    const bookingDocRef = doc(db, "bookings", bookingId);
+                    await updateDoc(bookingDocRef, {
+                        status: "active",
+                        updated_ts: serverTimestamp()
+                    });
+                    utils.showAlert(adminAlert, `Ride ${bookingId} has started!`, "success");
+                } catch (error) {
+                    console.error("IshanCabs: Failed to start ride", error);
                     utils.showAlert(adminAlert, "Status update failed: " + error.message);
                 }
             }
@@ -518,8 +646,9 @@ async function handleApprovalFormSubmit(e) {
     utils.showAlert(adminAlert, "Allocating driver and confirming ride...", "success");
 
     try {
-        const bookingDocRef = doc(db, "bookings", bookingId);
-        await updateDoc(bookingDocRef, {
+        const booking = bookingsData.find(b => b.id === bookingId);
+        const discountOverride = parseFloat(approveDiscountOverride.value);
+        const updatePayload = {
             status: "confirmed",
             driver_assignment: {
                 driver_name: driverName,
@@ -527,7 +656,25 @@ async function handleApprovalFormSubmit(e) {
                 vehicle_number: vehicleNumber
             },
             updated_ts: serverTimestamp()
-        });
+        };
+
+        if (!isNaN(discountOverride) && discountOverride >= 0) {
+            const baseFare = (booking.fare_details && typeof booking.fare_details.base_fare === "number")
+                ? booking.fare_details.base_fare
+                : booking.fare_details.estimated_fare;
+            const finalEstimatedFare = Math.max(0, baseFare - discountOverride);
+            
+            updatePayload.fare_details = {
+                ...booking.fare_details,
+                base_fare: baseFare,
+                discount_amount: discountOverride,
+                estimated_fare: finalEstimatedFare,
+                promo_code: discountOverride > 0 ? "ADMIN_OVERRIDE" : (booking.fare_details?.promo_code || null)
+            };
+        }
+
+        const bookingDocRef = doc(db, "bookings", bookingId);
+        await updateDoc(bookingDocRef, updatePayload);
 
         utils.showAlert(adminAlert, `Booking ${bookingId} approved and driver assigned successfully!`, "success");
     } catch (error) {
@@ -604,11 +751,13 @@ function initAdminMap(booking) {
     if (!pickupCoords && booking.trip_details.pickup_location) {
         pickupCoords = terminalCoordinates[booking.trip_details.pickup_location];
     }
-    if (!dropCoords && booking.trip_details.drop_location) {
-        dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+    if (booking.trip_details.ride_type !== "rental") {
+        if (!dropCoords && booking.trip_details.drop_location) {
+            dropCoords = terminalCoordinates[booking.trip_details.drop_location];
+        }
     }
 
-    if (!pickupCoords || !dropCoords) {
+    if (!pickupCoords || (booking.trip_details.ride_type !== "rental" && !dropCoords)) {
         console.warn("Could not find coordinates for admin booking map:", booking.id);
         mapContainer.style.display = "none";
         return;
@@ -631,22 +780,29 @@ function initAdminMap(booking) {
         }).addTo(map);
 
         const pickupMarker = L.marker(pickupCoords, { title: "Pickup Location" }).addTo(map);
-        const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
-
         pickupMarker.bindPopup(`<b>Pickup:</b> ${booking.trip_details.pickup_location}`);
-        dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
 
-        if (polyline && polyline.length > 0) {
-            L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+        if (booking.trip_details.ride_type !== "rental") {
+            const dropMarker = L.marker(dropCoords, { title: "Drop Location" }).addTo(map);
+            dropMarker.bindPopup(`<b>Drop:</b> ${booking.trip_details.drop_location}`);
+
+            if (polyline && polyline.length > 0) {
+                L.polyline(polyline, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(map);
+            } else {
+                L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+            }
+
+            const group = new L.featureGroup([pickupMarker, dropMarker]);
+            setTimeout(() => {
+                map.invalidateSize();
+                map.fitBounds(group.getBounds().pad(0.15));
+            }, 100);
         } else {
-            L.polyline([pickupCoords, dropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(map);
+            setTimeout(() => {
+                map.invalidateSize();
+                map.setView(pickupCoords, 14);
+            }, 100);
         }
-
-        const group = new L.featureGroup([pickupMarker, dropMarker]);
-        setTimeout(() => {
-            map.invalidateSize();
-            map.fitBounds(group.getBounds().pad(0.15));
-        }, 100);
 
         adminMaps[booking.id] = map;
     } catch (err) {
@@ -666,3 +822,246 @@ function destroyAllAdminMaps() {
     });
     adminMaps = {};
 }
+
+// =========================================================================
+// SYSTEM SETTINGS & DYNAMIC FARES CONTROL PANELS
+// =========================================================================
+
+function setupViewSwitchers() {
+    viewBookingsTab.addEventListener("click", () => {
+        // Swap active tab visual styles
+        viewBookingsTab.className = "pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200";
+        viewSettingsTab.className = "pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200";
+        
+        utils.showElement(panelBookings);
+        utils.hideElement(panelSettings);
+        
+        renderBookings();
+    });
+
+    viewSettingsTab.addEventListener("click", () => {
+        // Swap active tab visual styles
+        viewSettingsTab.className = "pb-4 text-base font-extrabold text-amber-500 border-b-2 border-amber-500 tracking-wide transition-all duration-200";
+        viewBookingsTab.className = "pb-4 text-base font-semibold text-slate-400 hover:text-white tracking-wide transition-all duration-200";
+        
+        utils.hideElement(panelBookings);
+        utils.showElement(panelSettings);
+        
+        // Hydrate data grids
+        loadFaresMatrix();
+        loadPromoOffers();
+    });
+}
+
+// Static default rates mapping fallback configuration
+const DEFAULT_RATES = {
+    sedan: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
+    suv:   { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
+    muv:   { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
+};
+
+async function loadFaresMatrix() {
+    if (!db) return;
+    try {
+        const ratesDocRef = doc(db, "settings", "rates");
+        const docSnap = await getDoc(ratesDocRef);
+        let rates = DEFAULT_RATES;
+        
+        if (docSnap.exists() && docSnap.data().rates) {
+            rates = docSnap.data().rates;
+        }
+        
+        // Hydrate Sedan Tier inputs
+        fareSedanBase.value = rates.sedan?.base_cost ?? 300;
+        fareSedanKm.value = rates.sedan?.rate_per_km ?? 12.00;
+        fareSedanHour.value = rates.sedan?.rate_per_hour ?? 150.00;
+        fareSedanAllowance.value = rates.sedan?.driver_allowance_per_day ?? 300.00;
+
+        // Hydrate SUV Tier inputs
+        fareSuvBase.value = rates.suv?.base_cost ?? 500;
+        fareSuvKm.value = rates.suv?.rate_per_km ?? 15.00;
+        fareSuvHour.value = rates.suv?.rate_per_hour ?? 200.00;
+        fareSuvAllowance.value = rates.suv?.driver_allowance_per_day ?? 400.00;
+
+        // Hydrate MUV Tier inputs
+        fareMuvBase.value = rates.muv?.base_cost ?? 700;
+        fareMuvKm.value = rates.muv?.rate_per_km ?? 18.00;
+        fareMuvHour.value = rates.muv?.rate_per_hour ?? 250.00;
+        fareMuvAllowance.value = rates.muv?.driver_allowance_per_day ?? 500.00;
+    } catch (err) {
+        console.error("Failed to load fare configurations:", err);
+        utils.showAlert(adminAlert, "Error fetching fare configurations: " + err.message);
+    }
+}
+
+async function handleFaresFormSubmit(e) {
+    e.preventDefault();
+    if (!db) return;
+
+    utils.showAlert(adminAlert, "Saving fare parameters dynamically...", "success");
+
+    const newRates = {
+        sedan: {
+            base_cost: parseFloat(fareSedanBase.value) || 0,
+            rate_per_km: parseFloat(fareSedanKm.value) || 0,
+            rate_per_hour: parseFloat(fareSedanHour.value) || 0,
+            driver_allowance_per_day: parseFloat(fareSedanAllowance.value) || 0
+        },
+        suv: {
+            base_cost: parseFloat(fareSuvBase.value) || 0,
+            rate_per_km: parseFloat(fareSuvKm.value) || 0,
+            rate_per_hour: parseFloat(fareSuvHour.value) || 0,
+            driver_allowance_per_day: parseFloat(fareSuvAllowance.value) || 0
+        },
+        muv: {
+            base_cost: parseFloat(fareMuvBase.value) || 0,
+            rate_per_km: parseFloat(fareMuvKm.value) || 0,
+            rate_per_hour: parseFloat(fareMuvHour.value) || 0,
+            driver_allowance_per_day: parseFloat(fareMuvAllowance.value) || 0
+        }
+    };
+
+    try {
+        const ratesDocRef = doc(db, "settings", "rates");
+        await setDoc(ratesDocRef, { rates: newRates });
+        utils.showAlert(adminAlert, "Fare matrix saved and updated successfully!", "success");
+    } catch (err) {
+        console.error("Failed to write dynamic settings rates doc:", err);
+        utils.showAlert(adminAlert, "Settings updates failed: " + err.message);
+    }
+}
+
+async function loadPromoOffers() {
+    if (!db) return;
+    try {
+        const offersCol = collection(db, "offers");
+        const snap = await getDocs(offersCol);
+        activePromosTbody.innerHTML = "";
+
+        if (snap.empty) {
+            activePromosTbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="py-4 text-center text-slate-500 italic">No coupons active in catalog database.</td>
+                </tr>
+            `;
+            return;
+        }
+
+        snap.forEach(docSnap => {
+            const offer = docSnap.data();
+            const tr = document.createElement("tr");
+            tr.className = "border-b border-slate-800/20 hover:bg-slate-900/20 transition-colors";
+
+            const valLabel = offer.discount_type === "percentage" ? `${offer.discount_value}%` : `₹${offer.discount_value}`;
+            
+            let statusBadge = `<span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-xl text-[10px] font-bold">ACTIVE</span>`;
+            if (offer.status !== "active") {
+                statusBadge = `<span class="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2.5 py-1 rounded-xl text-[10px] font-bold">INACTIVE</span>`;
+            }
+
+            const isVisible = offer.visible_to_customer === true;
+            let visibleBadge = `<span class="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2 py-0.5 rounded-lg text-[10px] font-bold">YES</span>`;
+            if (!isVisible) {
+                visibleBadge = `<span class="bg-slate-800 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-lg text-[10px] font-bold">NO</span>`;
+            }
+
+            tr.innerHTML = `
+                <td class="py-3 px-4 font-bold text-white tracking-wider">${offer.code}</td>
+                <td class="py-3 px-4 font-semibold">${valLabel}</td>
+                <td class="py-3 px-4 text-slate-400">₹${offer.min_fare_threshold}</td>
+                <td class="py-3 px-4">${statusBadge}</td>
+                <td class="py-3 px-4">${visibleBadge}</td>
+                <td class="py-3 px-4 text-right flex justify-end gap-2">
+                    <button type="button" class="btn-toggle-promo bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all" data-code="${offer.code}" data-status="${offer.status || 'active'}">
+                        ${offer.status === 'active' ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button type="button" class="btn-delete-promo bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all" data-code="${offer.code}">
+                        Delete
+                    </button>
+                </td>
+            `;
+            activePromosTbody.appendChild(tr);
+        });
+
+        bindPromoActions();
+    } catch (err) {
+        console.error("Failed to load offers:", err);
+        utils.showAlert(adminAlert, "Failed to load active catalog offers: " + err.message);
+    }
+}
+
+function bindPromoActions() {
+    document.querySelectorAll(".btn-toggle-promo").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const code = btn.getAttribute("data-code");
+            const currentStatus = btn.getAttribute("data-status");
+            const nextStatus = currentStatus === "active" ? "inactive" : "active";
+
+            utils.showAlert(adminAlert, `Toggling status of promo ${code}...`, "success");
+            try {
+                const offerRef = doc(db, "offers", code);
+                await updateDoc(offerRef, { status: nextStatus });
+                utils.showAlert(adminAlert, `Promo code ${code} status modified to ${nextStatus.toUpperCase()}!`, "success");
+                loadPromoOffers();
+            } catch (err) {
+                console.error("Promo status toggling error:", err);
+                utils.showAlert(adminAlert, "Toggling status failed: " + err.message);
+            }
+        });
+    });
+
+    document.querySelectorAll(".btn-delete-promo").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const code = btn.getAttribute("data-code");
+            if (confirm(`Are you sure you want to permanently delete promo coupon: ${code}?`)) {
+                utils.showAlert(adminAlert, `Deleting promo code ${code}...`, "success");
+                try {
+                    const offerRef = doc(db, "offers", code);
+                    await deleteDoc(offerRef);
+                    utils.showAlert(adminAlert, `Promo code ${code} deleted successfully.`, "success");
+                    loadPromoOffers();
+                } catch (err) {
+                    console.error("Failed to delete promo doc:", err);
+                    utils.showAlert(adminAlert, "Deletion transaction failed: " + err.message);
+                }
+            }
+        });
+    });
+}
+
+async function handlePromoFormSubmit(e) {
+    e.preventDefault();
+    if (!db) return;
+
+    const code = promoCodeInput.value.trim().toUpperCase();
+    const discountType = promoTypeSelect.value;
+    const discountValue = parseFloat(promoValueInput.value) || 0;
+    const minFare = parseFloat(promoMinFareInput.value) || 0;
+    const visibleToCustomer = promoVisibleInput.checked;
+
+    if (!code) {
+        alert("Please specify a promo code name.");
+        return;
+    }
+
+    utils.showAlert(adminAlert, `Creating new promo offer ${code}...`, "success");
+    try {
+        const offerRef = doc(db, "offers", code);
+        await setDoc(offerRef, {
+            code: code,
+            discount_type: discountType,
+            discount_value: discountValue,
+            min_fare_threshold: minFare,
+            status: "active",
+            visible_to_customer: visibleToCustomer
+        });
+
+        utils.showAlert(adminAlert, `Promo coupon code ${code} committed successfully!`, "success");
+        promoCodeForm.reset();
+        loadPromoOffers();
+    } catch (err) {
+        console.error("Failed to create offer:", err);
+        utils.showAlert(adminAlert, "Offer creation failed: " + err.message);
+    }
+}
+
