@@ -531,10 +531,8 @@ function renderBookings() {
                 </div>
                 ` : ""}
 
-                <!-- Requested Route Map Preview -->
-                ${booking.status === "pending_approval" ? `
+                <!-- Route Map Preview -->
                 <div id="map-admin-${booking.id}" class="h-40 w-full mt-3 rounded-2xl border border-slate-800/80 overflow-hidden relative z-10"></div>
-                ` : ""}
             </div>
 
             <!-- Action Controllers Panel -->
@@ -598,11 +596,9 @@ function renderBookings() {
         bookingsListContainer.appendChild(card);
     });
 
-    // Initialize maps for all requested bookings
+    // Initialize maps for all rendered bookings
     filteredBookings.forEach(booking => {
-        if (booking.status === "pending_approval") {
-            initAdminMap(booking);
-        }
+        initAdminMap(booking);
     });
 
     // Bind action events dynamically to injected DOM buttons
