@@ -282,8 +282,9 @@ Stores transactional ride requests, parameters, fare details, and driver/car all
 *   `estimated_km`: `number` (Driving distance).
 *   `base_fare`: `number` (Initial fare configuration mapping).
 *   `discount_amount`: `number` (Discount amount applied).
-*   `promo_code`: `string` or `null` (Coupon code code).
+*   `promo_code`: `string` or `null` (Coupon code code). Foreign Key referencing `/offers.id`.
 *   `estimated_fare`: `number` (Grand total amount: `base_fare - discount_amount`).
+*   `rates_version_id`: `string` or `null` (Foreign Key referencing `/rates_history.id`).
 
 #### `driver_assignment` Map Structure (or `null`):
 *   `driver_name`: `string` (Allocated operator name).
@@ -348,12 +349,25 @@ Global configurations used for dynamic system values.
 | Field Key | Data Type | Structure Map Description |
 | :--- | :--- | :--- |
 | `rates` | `Map (Object)` | Holds nested pricing matrices for vehicle tiers: `sedan`, `suv`, and `muv`. |
+| `active_version_id`| `string` | Foreign Key referencing `/rates_history.id`. |
+| `updated_ts` | `Timestamp` | Setting update timestamp. |
 
 #### Nested Tier Rate Map Structure:
 *   `base_cost`: `number` (Base booking minimum charge).
 *   `rate_per_km`: `number` (Distance per-kilometer multiplier).
 *   `rate_per_hour`: `number` (Hourly duration multiplier for rentals).
 *   `driver_allowance_per_day`: `number` (Outstation operator daily halt allowance).
+
+---
+
+### 7. Rates History Collection (`/rates_history/{version_id}`)
+Audit log of all historical rate configurations. Enables historical booking calculations to be audited back to the active rates configuration used during checkout.
+*   **Document ID**: `R-` followed by creation timestamp (e.g. `R-1717540200000`).
+
+| Field Key | Data Type | Description |
+| :--- | :--- | :--- |
+| `rates` | `Map (Object)` | Pricing matrices for vehicle tiers (same structure as above). |
+| `creation_ts` | `Timestamp` | Version registration timestamp. |
 
 ---
 
@@ -378,7 +392,7 @@ erDiagram
         string status
         string payment_status
         object trip_details
-        object fare_details
+        object fare_details "Contains promo_code FK and rates_version_id FK"
         object driver_assignment FK "Holds reference fields to drivers & vehicles"
         object feedback
         string rejection_reason
@@ -419,10 +433,21 @@ erDiagram
     settings_rates {
         string id PK "Document ID ('rates')"
         object rates "Map containing sedan, suv, muv parameters"
+        string active_version_id FK "References rates_history.id"
+        timestamp updated_ts
+    }
+    
+    rates_history {
+        string id PK "Document ID (version string)"
+        object rates "Map containing sedan, suv, muv parameters"
+        timestamp creation_ts
     }
 
     users ||--o{ bookings : "submits"
     drivers |o--o| vehicles : "assigned bidirectionally (assigned_vehicle_id / assigned_driver_id)"
     bookings }o--o| drivers : "allocated on approval (driver_assignment.driver_phone)"
     bookings }o--o| vehicles : "allocated on approval (driver_assignment.vehicle_number)"
+    bookings }o--o| offers : "applies coupon (fare_details.promo_code)"
+    bookings }o--o| rates_history : "calculated under configuration (fare_details.rates_version_id)"
+    settings_rates }o--|| rates_history : "tracks active version (active_version_id)"
 ```

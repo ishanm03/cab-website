@@ -202,7 +202,7 @@ Please confirm driver and vehicle allocation details. Thank you!`;
     async fetchRates() {
         if (!db) {
             console.warn("IshanCabs: Firestore not initialized. Using default rates.");
-            return RATE_CONFIG;
+            return { rates: RATE_CONFIG, version_id: null };
         }
         try {
             const docRef = doc(db, "settings", "rates");
@@ -210,13 +210,13 @@ Please confirm driver and vehicle allocation details. Thank you!`;
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data && data.rates) {
-                    return data.rates;
+                    return { rates: data.rates, version_id: data.active_version_id || null };
                 }
             }
-            return RATE_CONFIG;
+            return { rates: RATE_CONFIG, version_id: null };
         } catch (error) {
             console.error("IshanCabs: Error fetching rates settings:", error);
-            return RATE_CONFIG;
+            return { rates: RATE_CONFIG, version_id: null };
         }
     },
 

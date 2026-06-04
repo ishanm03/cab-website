@@ -1019,9 +1019,24 @@ async function handleFaresFormSubmit(e) {
     };
 
     try {
+        const versionId = "R-" + Date.now();
+
+        // 1. Write the new version to rates_history collection
+        const historyDocRef = doc(db, "rates_history", versionId);
+        await setDoc(historyDocRef, {
+            rates: newRates,
+            creation_ts: serverTimestamp()
+        });
+
+        // 2. Update settings/rates with active version ID
         const ratesDocRef = doc(db, "settings", "rates");
-        await setDoc(ratesDocRef, { rates: newRates });
-        utils.showAlert(adminAlert, "Fare matrix saved and updated successfully!", "success");
+        await setDoc(ratesDocRef, {
+            rates: newRates,
+            active_version_id: versionId,
+            updated_ts: serverTimestamp()
+        });
+
+        utils.showAlert(adminAlert, "Fare matrix saved and history version logged successfully!", "success");
     } catch (err) {
         console.error("Failed to write dynamic settings rates doc:", err);
         utils.showAlert(adminAlert, "Settings updates failed: " + err.message);

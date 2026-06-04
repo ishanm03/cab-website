@@ -88,6 +88,7 @@ let currentRouteData = {
 let selectedVehicleTier = null;
 let selectedVehicleFare = 0; // Represents base fare before discounts
 let appliedPromo = null; // { code: string, discount: number }
+let activeRatesVersionId = null; // Tracks rates_history document for auditing
 
 // Map & Geocoding State Variables
 const bookingMapWrapper = document.getElementById("booking-map-wrapper");
@@ -737,7 +738,9 @@ async function handleStep1Submit(e) {
 
     // Process rates and time-aware inventory availability check for each category (Sedan, SUV, MUV)
     try {
-        const activeRates = await bookingService.fetchRates();
+        const ratesResponse = await bookingService.fetchRates();
+        const activeRates = ratesResponse.rates;
+        activeRatesVersionId = ratesResponse.version_id;
         const tiers = ["sedan", "suv", "muv"];
         
         for (const tier of tiers) {
@@ -1005,7 +1008,8 @@ async function handleFinalConfirm() {
             base_fare: selectedVehicleFare,
             discount_amount: appliedPromo ? appliedPromo.discount : 0,
             promo_code: appliedPromo ? appliedPromo.code : null,
-            estimated_fare: appliedPromo ? (selectedVehicleFare - appliedPromo.discount) : selectedVehicleFare
+            estimated_fare: appliedPromo ? (selectedVehicleFare - appliedPromo.discount) : selectedVehicleFare,
+            rates_version_id: activeRatesVersionId
         }
     };
 
