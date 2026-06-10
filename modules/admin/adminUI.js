@@ -1192,6 +1192,7 @@ function startFleetSnapshotListeners() {
         });
         
         renderFleetInventory();
+        renderDriverRegistry();
         populateAssociationDropdowns();
         loadFleetRoster();
     }, (error) => {
@@ -1206,6 +1207,7 @@ function startFleetSnapshotListeners() {
         });
         
         renderDriverRegistry();
+        renderFleetInventory();
         populateAssociationDropdowns();
         loadFleetRoster();
     }, (error) => {
