@@ -1,5 +1,17 @@
 {
-  "sedan": [
+  "compact": [
+    {
+      "driver_name": "Arjun Das",
+      "driver_phone": "+919876543220",
+      "vehicle_number": "WB-02-K-3333"
+    },
+    {
+      "driver_name": "Rahul Verma",
+      "driver_phone": "+919876543221",
+      "vehicle_number": "WB-02-K-5555"
+    }
+  ],
+  "premium": [
     {
       "driver_name": "Rajesh Kumar",
       "driver_phone": "+918981538038",

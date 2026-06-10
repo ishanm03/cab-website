@@ -25,6 +25,8 @@ Operational stability upgrades for high-traffic handling.
 Small enhancements to improve the customer booking experience.
 *   `[ ]` **Task 3.1: Promo Code "Copy" Shortcut**
     *   **Description**: Add an interactive "Copy" button next to active promo code offers in Step 3 ("Review Booking Page") so riders can copy the discount code to their clipboard with a single click.
+*   `[ ]` **Task 3.2: Dynamic Bag Capacity Validation & Input**
+    *   **Description**: Review if dynamic bag/luggage capacity tracking and verification is required for the MVP. If so, convert static capacity descriptions into editable vehicle properties and validate them during checkout.
 
 ### 🔒 Epic 4: Production Architecture Upgrade (MVP)
 Major structural redesign for backend security and database isolation.

@@ -15,16 +15,18 @@ import {
 
 // Static Default Fleet Size Configurations (Fallback if Firestore database is empty)
 const DEFAULT_FLEET_SIZES = {
-    sedan: 5, // Up to 5 Sedans can be booked concurrently
-    suv: 3,   // Up to 3 SUVs can be booked concurrently
-    muv: 2    // Up to 2 Group MUVs can be booked concurrently
+    compact: 5,
+    premium: 5,
+    suv: 3,
+    muv: 2
 };
 
 // Rate matrix configurations for custom computations (INR)
 const RATE_CONFIG = {
-    sedan: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
-    suv:   { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
-    muv:   { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
+    compact: { rate_per_km: 10.00, driver_allowance_per_day: 300.00, rate_per_hour: 120.00, base_cost: 250.00 },
+    premium: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
+    suv:     { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
+    muv:     { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
 };
 
 const bookingService = {
@@ -33,7 +35,7 @@ const bookingService = {
      * @param {string} rideType - "local" | "intercity" | "outstation" | "rental"
      * @param {number} distance - Distance in kilometers (from routesMatrix)
      * @param {number} days - Outstation duration (in days)
-     * @param {string} tier - "sedan" | "suv" | "muv"
+     * @param {string} tier - "compact" | "premium" | "suv" | "muv"
      * @param {object} flatMetrics - Flat metrics from routeMatrix if available
      * @param {number} hours - Rental duration (in hours)
      * @param {object} activeRates - Dynamic rates setting from Firestore
@@ -46,19 +48,20 @@ const bookingService = {
         const actualHours = Math.max(1, parseInt(hours) || 1);
         
         const rates = activeRates || RATE_CONFIG;
-        const config = rates[tier] || RATE_CONFIG[tier] || RATE_CONFIG.sedan;
+        const config = rates[tier] || RATE_CONFIG[tier] || RATE_CONFIG.premium;
         
         // 1. Hourly rental calculations
         if (rideType === "rental") {
-            const hourlyRate = config.rate_per_hour || (tier === "sedan" ? 150 : (tier === "suv" ? 200 : 250));
+            const hourlyRate = config.rate_per_hour || (tier === "compact" ? 120 : (tier === "premium" ? 150 : (tier === "suv" ? 200 : 250)));
             return Math.round(hourlyRate * actualHours);
         }
 
         // 2. If Local / Intercity and flat-rates are mapped in our routesMatrix, use them!
         if ((rideType === "local" || rideType === "intercity") && flatMetrics) {
-            if (tier === "sedan" && flatMetrics.base_fare_sedan) return flatMetrics.base_fare_sedan;
-            if (tier === "suv" && flatMetrics.base_fare_suv) return flatMetrics.base_fare_suv;
-            if (tier === "muv") return (flatMetrics.base_fare_suv || 1000) * 1.25; // MUV is 25% premium over SUV flat-rate
+            if (tier === "compact") return flatMetrics.base_fare_compact || Math.round((flatMetrics.base_fare_premium || flatMetrics.base_fare_sedan || 999) * 0.85);
+            if (tier === "premium") return flatMetrics.base_fare_premium || flatMetrics.base_fare_sedan;
+            if (tier === "suv") return flatMetrics.base_fare_suv;
+            if (tier === "muv") return flatMetrics.base_fare_muv || Math.round((flatMetrics.base_fare_suv || 1000) * 1.25);
         }
 
         // 3. Fallback or Outstation computations (Round-Trip pricing based on West Bengal standard guidelines)
@@ -78,7 +81,7 @@ const bookingService = {
         } else {
             // Fallback for custom local point-to-point without flat-fares
             const distanceCost = actualDistance * config.rate_per_km;
-            const baseCost = config.base_cost || (tier === "sedan" ? 300 : (tier === "suv" ? 500 : 700));
+            const baseCost = config.base_cost || (tier === "compact" ? 250 : (tier === "premium" ? 300 : (tier === "suv" ? 500 : 700)));
             return Math.round(baseCost + distanceCost);
         }
     },
@@ -86,7 +89,7 @@ const bookingService = {
     /**
      * Checks if a vehicle tier has availability for the selected pickup date
      * Prevents overbooking by comparing active bookings vs total fleet sizes
-     * @param {string} tier - "sedan" | "suv" | "muv"
+     * @param {string} tier - "compact" | "premium" | "suv" | "muv"
      * @param {string} dateString - "YYYY-MM-DD"
      * @returns {Promise<boolean>} Available status
      */

@@ -100,6 +100,11 @@
                         <select id="pickup-select" required class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
                             <option value="" disabled selected>Loading locations...</option>
                         </select>
+                        <!-- Custom Pickup Text Input -->
+                        <div id="custom-pickup-container" class="hidden mt-3">
+                            <label for="custom-pickup-address" class="block text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1">Enter Custom Pickup Address</label>
+                            <input type="text" id="custom-pickup-address" placeholder="E.g. House No 4, Salt Lake Sector 1, Kolkata" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3 rounded-xl outline-none transition-all duration-300 text-xs font-medium">
+                        </div>
                     </div>
 
                     <!-- Drop Select -->
@@ -108,44 +113,22 @@
                         <select id="drop-select" required disabled class="w-full bg-slate-950/40 border border-slate-800 text-slate-500 px-4 py-4 rounded-2xl outline-none transition-all duration-300 font-medium appearance-none">
                             <option value="" disabled selected>Select pickup first</option>
                         </select>
+                        <!-- Custom Drop Text Input -->
+                        <div id="custom-drop-container" class="hidden mt-3">
+                            <label for="custom-drop-address" class="block text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1">Enter Custom Drop Address</label>
+                            <input type="text" id="custom-drop-address" placeholder="E.g. Gate 3, City Center II, Rajarhat" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3 rounded-xl outline-none transition-all duration-300 text-xs font-medium">
+                        </div>
                     </div>
 
-                    <!-- Collapsible Map Container (Visible only when 'Custom Location' is active) -->
+                    <!-- Collapsible Map Container (Visible only when BOTH points are pre-defined locations) -->
                     <div id="booking-map-wrapper" class="hidden space-y-4 bg-slate-900/40 backdrop-blur-xl p-5 rounded-2xl border border-slate-800/80">
                         <div class="flex justify-between items-center">
-                            <span class="text-xs font-bold uppercase tracking-wider text-amber-500 block">🗺️ Map Address Picker</span>
-                            <span id="map-instructions" class="text-[10px] text-slate-400">Search address or drag marker to select spot</span>
-                        </div>
-                        
-                        <!-- Search Box for Geocoding -->
-                        <div class="space-y-2">
-                            <div class="flex gap-2">
-                                <input type="text" id="map-search-input" placeholder="Search address (e.g. Howrah Station)..." class="flex-grow bg-slate-950 border border-slate-800 focus:border-amber-500 text-white px-4 py-3.5 rounded-xl outline-none transition-all duration-300 text-xs font-medium">
-                                <button type="button" id="btn-map-search" class="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold px-4 py-3.5 rounded-xl transition-all duration-300">
-                                    Search
-                                </button>
-                            </div>
-                            <div class="flex items-center gap-4 text-[10px] font-bold text-slate-400 pl-1" id="map-search-targets">
-                                <span class="uppercase tracking-wider">Set Search Target:</span>
-                                <label class="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors duration-200">
-                                    <input type="radio" name="search-target" value="pickup" checked class="accent-amber-500 w-3 h-3">
-                                    <span>Pickup Marker</span>
-                                </label>
-                                <label class="flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors duration-200">
-                                    <input type="radio" name="search-target" value="drop" class="accent-amber-500 w-3 h-3">
-                                    <span>Drop Marker</span>
-                                </label>
-                            </div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-500 block">🗺️ Route Map Preview</span>
+                            <span id="map-instructions" class="text-[10px] text-slate-400">Predefined Route Map</span>
                         </div>
                         
                         <!-- Leaflet map canvas -->
                         <div id="booking-map" class="h-60 w-full rounded-xl border border-slate-800 overflow-hidden relative z-10"></div>
-                        
-                        <!-- Selected Coordinates Display (read-only info badge) -->
-                        <div class="flex justify-between text-[10px] text-slate-500 font-medium">
-                            <span id="pickup-coords-badge">Pickup Coords: --, --</span>
-                            <span id="drop-coords-badge">Drop Coords: --, --</span>
-                        </div>
                     </div>
 
                     <!-- Date & Time Row -->
@@ -226,8 +209,8 @@
 
                 <!-- Active Car Grid -->
                 <div id="fleet-list-container" class="space-y-4">
-                    <!-- Sedan Card -->
-                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="sedan">
+                    <!-- Compact Ride Card -->
+                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="compact">
                         <div class="flex items-center gap-4">
                             <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-500">
                                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -235,7 +218,29 @@
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="font-bold text-lg text-white">Sedan</h3>
+                                <h3 class="font-bold text-lg text-white">Compact Ride</h3>
+                                <p class="text-slate-400 text-xs mt-0.5">Alto, Kwid • Up to 4 passengers • 1 bag</p>
+                            </div>
+                        </div>
+                        <div class="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center">
+                            <span class="text-slate-400 text-xs sm:mb-1">Estimated Fare</span>
+                            <span class="car-fare-display text-2xl font-black text-amber-500">₹----</span>
+                        </div>
+                        <div class="sold-out-overlay absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 hidden flex items-center justify-center">
+                            <span class="bg-rose-500/20 border border-rose-500/40 text-rose-400 font-extrabold text-sm py-2 px-5 rounded-2xl tracking-widest uppercase">Sold Out</span>
+                        </div>
+                    </div>
+
+                    <!-- Premium Ride Card -->
+                    <div class="car-card cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-slate-950/60 border-2 border-slate-800 hover:border-slate-700 rounded-2xl gap-4 relative overflow-hidden transition-all duration-300" data-tier="premium">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-500">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-white">Premium Ride</h3>
                                 <p class="text-slate-400 text-xs mt-0.5">Dzire, Etios • Up to 4 passengers • 2 bags</p>
                             </div>
                         </div>
@@ -280,7 +285,7 @@
                             </div>
                             <div>
                                 <h3 class="font-bold text-lg text-white">Group MUV</h3>
-                                <p class="text-slate-400 text-xs mt-0.5">Innova, Marazzo • Up to 7 passengers • 4 bags</p>
+                                <p class="text-slate-400 text-xs mt-0.5">Innova, Marazzo • Up to 12 passengers • 4 bags</p>
                             </div>
                         </div>
                         <div class="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0 flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center">
@@ -335,7 +340,7 @@
                     </div>
                     <div class="flex justify-between text-sm py-1 border-b border-slate-800/40">
                         <span class="text-slate-400 font-semibold">Vehicle Class</span>
-                        <span id="summary-tier" class="font-bold text-white">Sedan</span>
+                        <span id="summary-tier" class="font-bold text-white">Premium Ride</span>
                     </div>
                     
                     <!-- Base Fare & Discounts -->
@@ -349,9 +354,14 @@
                     </div>
 
                     <!-- Grand Total -->
-                    <div class="flex justify-between items-center pt-4 border-t border-slate-800">
-                        <span class="text-base text-slate-300 font-bold">Estimated Grand Total</span>
-                        <span id="summary-grand-total" class="text-3xl font-black text-amber-500">₹----</span>
+                    <div class="flex-col pt-4 border-t border-slate-800">
+                        <div class="flex justify-between items-center w-full">
+                            <span class="text-base text-slate-300 font-bold">Estimated Grand Total</span>
+                            <span id="summary-grand-total" class="text-3xl font-black text-amber-500">₹----</span>
+                        </div>
+                        <div id="custom-fare-notice" class="hidden text-xs text-amber-400 font-semibold mt-1.5 text-right italic">
+                            Fare Estimate: Will be confirmed shortly
+                        </div>
                     </div>
                 </div>
 

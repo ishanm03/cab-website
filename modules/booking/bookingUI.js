@@ -1,12 +1,19 @@
 // modules/booking/bookingUI.js
 
-import { auth } from "../shared/firebase.js";
+import { auth, db } from "../shared/firebase.js";
 import { dbService } from "../shared/dbService.js";
 import { utils } from "../shared/utils.js";
-import { routesMatrix, getPickupLocations, getDropDestinations, getRouteMetrics, terminalCoordinates } from "../shared/routesMatrix.js";
+import { routesMatrix, getRouteMetrics, terminalCoordinates } from "../shared/routesMatrix.js";
 import { bookingService } from "./bookingService.js?v=20260603";
 import { authService } from "../auth/authService.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { 
+    collection, 
+    getDocs, 
+    query, 
+    where, 
+    orderBy 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // DOM Selector Handles
 const riderWelcome = document.getElementById("rider-welcome");
@@ -40,6 +47,13 @@ const outstationDaysContainer = document.getElementById("outstation-days-contain
 const outstationDaysInput = document.getElementById("outstation-days");
 const rentalHoursContainer = document.getElementById("rental-hours-container");
 const rentalHoursSelect = document.getElementById("rental-hours");
+
+// Custom Address inputs
+const customPickupContainer = document.getElementById("custom-pickup-container");
+const customPickupAddress = document.getElementById("custom-pickup-address");
+const customDropContainer = document.getElementById("custom-drop-container");
+const customDropAddress = document.getElementById("custom-drop-address");
+const customFareNotice = document.getElementById("custom-fare-notice");
 
 // Step 2 elements
 const routeKmBadge = document.getElementById("route-km-badge");
@@ -92,10 +106,6 @@ let activeRatesVersionId = null; // Tracks rates_history document for auditing
 
 // Map & Geocoding State Variables
 const bookingMapWrapper = document.getElementById("booking-map-wrapper");
-const mapSearchInput = document.getElementById("map-search-input");
-const btnMapSearch = document.getElementById("btn-map-search");
-const pickupCoordsBadge = document.getElementById("pickup-coords-badge");
-const dropCoordsBadge = document.getElementById("drop-coords-badge");
 
 let mapInstance = null;
 let pickupMarker = null;
@@ -104,6 +114,8 @@ let mapPickupCoords = null; // [lat, lng]
 let mapDropCoords = null;   // [lat, lng]
 let mapPickupAddress = "";
 let mapDropAddress = "";
+
+let dbLocations = []; // Loaded dynamically from Firestore
 
 // Initialize setup listeners
 document.addEventListener("DOMContentLoaded", () => {
@@ -119,8 +131,8 @@ function initBookingUI() {
     // 2. Logout trigger
     btnRiderLogout.addEventListener("click", handleLogout);
 
-    // 3. Hydrate routes and time dropdowns
-    hydratePickupLocations();
+    // 3. Hydrate routes and time dropdowns dynamically from database
+    loadDynamicLocations();
     populateTimeDropdown();
 
     // 4. Change pickups and populate drop options
@@ -191,15 +203,36 @@ async function handleLogout() {
     }
 }
 
+// Loads predefined locations from Firestore
+async function loadDynamicLocations() {
+    try {
+        if (!db) throw new Error("Firestore not initialized.");
+        const snap = await getDocs(query(collection(db, "locations"), orderBy("name")));
+        dbLocations = snap.docs.map(doc => doc.data());
+        console.log(`Loaded ${dbLocations.length} predefined locations from Firestore.`);
+        hydratePickupLocations();
+    } catch (error) {
+        console.error("Failed to load locations, using fallback coordinates:", error);
+        dbLocations = Object.entries(terminalCoordinates).map(([name, coords]) => ({
+            id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
+            name: name,
+            lat: coords[0],
+            lng: coords[1],
+            type: "both"
+        }));
+        hydratePickupLocations();
+    }
+}
+
 // Hydrates select with available locations
 function hydratePickupLocations() {
     pickupSelect.innerHTML = `<option value="" disabled selected>Select Pickup Node</option>
                               <option value="Custom Location">Custom Location</option>`;
-    const pickups = getPickupLocations();
+    const pickups = dbLocations.filter(loc => loc.type === "pickup" || loc.type === "both");
     pickups.forEach(loc => {
         const opt = document.createElement("option");
-        opt.value = loc;
-        opt.textContent = loc;
+        opt.value = loc.name;
+        opt.textContent = loc.name;
         pickupSelect.appendChild(opt);
     });
 }
@@ -222,30 +255,63 @@ function handlePickupChange() {
 
     let drops = [];
     if (pickupVal === "Custom Location") {
-        drops = getPickupLocations();
+        drops = dbLocations.filter(loc => loc.type === "drop" || loc.type === "both");
     } else {
-        drops = getDropDestinations(pickupVal);
+        drops = dbLocations.filter(loc => (loc.type === "drop" || loc.type === "both") && loc.name !== pickupVal);
     }
     drops.forEach(dest => {
         const opt = document.createElement("option");
-        opt.value = dest;
-        opt.textContent = dest;
+        opt.value = dest.name;
+        opt.textContent = dest.name;
         dropSelect.appendChild(opt);
     });
 
+    toggleCustomAddressFields();
     toggleMapVisibility();
 }
 
 function handleDropChange() {
     utils.hideElement(bookingAlert);
+    toggleCustomAddressFields();
     toggleMapVisibility();
 }
 
-function toggleMapVisibility() {
+function toggleCustomAddressFields() {
     const isPickupCustom = pickupSelect.value === "Custom Location";
     const isDropCustom = dropSelect.value === "Custom Location";
+    const category = document.querySelector('input[name="ride-category"]:checked')?.value || "local";
 
-    if (isPickupCustom || isDropCustom) {
+    if (isPickupCustom) {
+        utils.showElement(customPickupContainer);
+        customPickupAddress.required = true;
+    } else {
+        utils.hideElement(customPickupContainer);
+        customPickupAddress.required = false;
+        customPickupAddress.value = "";
+    }
+
+    if (isDropCustom && category !== "rental") {
+        utils.showElement(customDropContainer);
+        customDropAddress.required = true;
+    } else {
+        utils.hideElement(customDropContainer);
+        customDropAddress.required = false;
+        customDropAddress.value = "";
+    }
+}
+
+function toggleMapVisibility() {
+    const pickupVal = pickupSelect.value;
+    const dropVal = dropSelect.value;
+    const category = document.querySelector('input[name="ride-category"]:checked')?.value || "local";
+
+    const isPickupPredefined = pickupVal && pickupVal !== "Custom Location";
+    const isDropPredefined = dropVal && dropVal !== "Custom Location";
+
+    if (category === "rental" && isPickupPredefined) {
+        utils.showElement(bookingMapWrapper);
+        initOrUpdateMap();
+    } else if (category !== "rental" && isPickupPredefined && isDropPredefined) {
         utils.showElement(bookingMapWrapper);
         initOrUpdateMap();
     } else {
@@ -257,83 +323,45 @@ function initOrUpdateMap() {
     const kolkataCenter = [22.5726, 88.3639];
 
     if (!mapInstance) {
-        // Initialize Leaflet map
-        mapInstance = L.map('booking-map').setView(kolkataCenter, 12);
+        // Initialize Leaflet map as read-only preview
+        mapInstance = L.map('booking-map', {
+            dragging: false,
+            touchZoom: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            keyboard: false,
+            zoomControl: true
+        }).setView(kolkataCenter, 12);
         
         // Add OpenStreetMap Standard tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(mapInstance);
-
-        // Bind Search listeners
-        btnMapSearch.addEventListener("click", handleMapSearch);
-        mapSearchInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                handleMapSearch();
-            }
-        });
     }
 
     const pickupVal = pickupSelect.value;
     const dropVal = dropSelect.value;
-
-    // Resolve or default pickup coordinates
-    if (pickupVal === "Custom Location") {
-        if (!mapPickupCoords) {
-            mapPickupCoords = [22.5726, 88.3539];
-            mapPickupAddress = "Custom Pickup Location";
-        }
-    } else if (pickupVal && terminalCoordinates[pickupVal]) {
-        mapPickupCoords = terminalCoordinates[pickupVal];
-        mapPickupAddress = pickupVal;
-    } else {
-        mapPickupCoords = null;
-        mapPickupAddress = "";
-    }
-
-    // Resolve or default drop coordinates
     const category = document.querySelector('input[name="ride-category"]:checked')?.value || "local";
-    if (category === "rental") {
-        mapDropCoords = null;
-        mapDropAddress = "";
-    } else if (dropVal === "Custom Location") {
-        if (!mapDropCoords) {
-            mapDropCoords = [22.5726, 88.3739];
-            mapDropAddress = "Custom Drop Location";
-        }
-    } else if (dropVal && terminalCoordinates[dropVal]) {
-        mapDropCoords = terminalCoordinates[dropVal];
-        mapDropAddress = dropVal;
-    } else {
-        mapDropCoords = null;
-        mapDropAddress = "";
-    }
+
+    // Find predefined coordinates in dbLocations
+    const pickupLoc = dbLocations.find(l => l.name === pickupVal);
+    mapPickupCoords = pickupLoc ? [pickupLoc.lat, pickupLoc.lng] : null;
+    mapPickupAddress = pickupVal || "";
+
+    const dropLoc = dbLocations.find(l => l.name === dropVal);
+    mapDropCoords = (category !== "rental" && dropLoc) ? [dropLoc.lat, dropLoc.lng] : null;
+    mapDropAddress = dropVal || "";
 
     // Draw/update Pickup Marker
     if (mapPickupCoords) {
-        const isDraggable = pickupVal === "Custom Location";
         if (pickupMarker) {
             pickupMarker.setLatLng(mapPickupCoords);
-            if (isDraggable) {
-                pickupMarker.dragging.enable();
-            } else {
-                pickupMarker.dragging.disable();
-            }
         } else {
             pickupMarker = L.marker(mapPickupCoords, {
-                draggable: isDraggable,
                 title: "Pickup Location"
             }).addTo(mapInstance);
-
-            pickupMarker.on('dragend', async () => {
-                const latlng = pickupMarker.getLatLng();
-                mapPickupCoords = [latlng.lat, latlng.lng];
-                updateCoordsBadges();
-                mapPickupAddress = await reverseGeocode(latlng.lat, latlng.lng);
-                updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
-            });
         }
         updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
     } else {
@@ -345,27 +373,12 @@ function initOrUpdateMap() {
 
     // Draw/update Drop Marker
     if (mapDropCoords) {
-        const isDraggable = dropVal === "Custom Location";
         if (dropMarker) {
             dropMarker.setLatLng(mapDropCoords);
-            if (isDraggable) {
-                dropMarker.dragging.enable();
-            } else {
-                dropMarker.dragging.disable();
-            }
         } else {
             dropMarker = L.marker(mapDropCoords, {
-                draggable: isDraggable,
                 title: "Drop Location"
             }).addTo(mapInstance);
-
-            dropMarker.on('dragend', async () => {
-                const latlng = dropMarker.getLatLng();
-                mapDropCoords = [latlng.lat, latlng.lng];
-                updateCoordsBadges();
-                mapDropAddress = await reverseGeocode(latlng.lat, latlng.lng);
-                updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
-            });
         }
         updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
     } else {
@@ -375,125 +388,50 @@ function initOrUpdateMap() {
         }
     }
 
-    updateCoordsBadges();
+    // Draw/update polyline if both are present
+    if (mapPickupCoords && mapDropCoords) {
+        fetchOSRMRoute(mapPickupCoords, mapDropCoords).then(routeData => {
+            const coords = routeData.geometry.coordinates;
+            const polylinePoints = coords.map(coord => [coord[1], coord[0]]);
+            
+            if (window.bookingPolyline) {
+                mapInstance.removeLayer(window.bookingPolyline);
+            }
+            window.bookingPolyline = L.polyline(polylinePoints, { color: '#f59e0b', weight: 4, opacity: 0.8 }).addTo(mapInstance);
+            
+            const group = new L.featureGroup([pickupMarker, dropMarker]);
+            mapInstance.fitBounds(group.getBounds().pad(0.15));
+        }).catch(err => {
+            console.warn("OSRM route fetch failed for preview:", err);
+            // Draw straight line fallback
+            if (window.bookingPolyline) {
+                mapInstance.removeLayer(window.bookingPolyline);
+            }
+            window.bookingPolyline = L.polyline([mapPickupCoords, mapDropCoords], { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '5, 5' }).addTo(mapInstance);
+            const group = new L.featureGroup([pickupMarker, dropMarker]);
+            mapInstance.fitBounds(group.getBounds().pad(0.15));
+        });
+    } else {
+        if (window.bookingPolyline) {
+            mapInstance.removeLayer(window.bookingPolyline);
+            window.bookingPolyline = null;
+        }
+        if (mapPickupCoords) {
+            mapInstance.setView(mapPickupCoords, 14);
+        }
+    }
 
-    // Adjust view size and bounds
+    // Adjust view size
     setTimeout(() => {
         if (mapInstance) {
             mapInstance.invalidateSize();
-            if (mapPickupCoords && mapDropCoords) {
-                const group = new L.featureGroup([pickupMarker, dropMarker]);
-                mapInstance.fitBounds(group.getBounds().pad(0.15));
-            } else if (mapPickupCoords) {
-                mapInstance.setView(mapPickupCoords, 14);
-            } else if (mapDropCoords) {
-                mapInstance.setView(mapDropCoords, 14);
-            }
         }
     }, 100);
-}
-
-async function reverseGeocode(lat, lng) {
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-            headers: {
-                'Accept-Language': 'en'
-            }
-        });
-        if (!response.ok) throw new Error("Reverse geocode failed");
-        const data = await response.json();
-        return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    } catch (err) {
-        console.error("Reverse geocoding error:", err);
-        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    }
 }
 
 function updateMarkerPopup(marker, text) {
     if (!marker) return;
     marker.bindPopup(text).openPopup();
-}
-
-function updateCoordsBadges() {
-    if (mapPickupCoords) {
-        pickupCoordsBadge.textContent = `Pickup Coords: ${mapPickupCoords[0].toFixed(4)}, ${mapPickupCoords[1].toFixed(4)}`;
-    } else {
-        pickupCoordsBadge.textContent = "Pickup Coords: --, --";
-    }
-    if (mapDropCoords) {
-        dropCoordsBadge.textContent = `Drop Coords: ${mapDropCoords[0].toFixed(4)}, ${mapDropCoords[1].toFixed(4)}`;
-    } else {
-        dropCoordsBadge.textContent = "Drop Coords: --, --";
-    }
-}
-
-async function handleMapSearch() {
-    const query = mapSearchInput.value.trim();
-    if (!query) return;
-
-    const targetRadio = document.querySelector('input[name="search-target"]:checked');
-    const target = targetRadio ? targetRadio.value : "pickup";
-
-    const isPickupCustom = pickupSelect.value === "Custom Location";
-    const isDropCustom = dropSelect.value === "Custom Location";
-
-    if (target === "pickup" && !isPickupCustom) {
-        utils.showAlert(bookingAlert, "Pickup location is not set to 'Custom Location'. Change selection in the dropdown first.");
-        return;
-    }
-    if (target === "drop" && !isDropCustom) {
-        utils.showAlert(bookingAlert, "Drop location is not set to 'Custom Location'. Change selection in the dropdown first.");
-        return;
-    }
-
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, {
-            headers: {
-                'Accept-Language': 'en'
-            }
-        });
-        if (!response.ok) throw new Error("Geocode search failed");
-        const results = await response.json();
-        if (results && results.length > 0) {
-            const lat = parseFloat(results[0].lat);
-            const lng = parseFloat(results[0].lon);
-            const address = results[0].display_name;
-
-            if (target === "pickup") {
-                mapPickupCoords = [lat, lng];
-                mapPickupAddress = address;
-                if (pickupMarker) {
-                    pickupMarker.setLatLng(mapPickupCoords);
-                } else {
-                    pickupMarker = L.marker(mapPickupCoords, { draggable: true, title: "Pickup Location" }).addTo(mapInstance);
-                }
-                updateMarkerPopup(pickupMarker, "Pickup: " + mapPickupAddress);
-            } else {
-                mapDropCoords = [lat, lng];
-                mapDropAddress = address;
-                if (dropMarker) {
-                    dropMarker.setLatLng(mapDropCoords);
-                } else {
-                    dropMarker = L.marker(mapDropCoords, { draggable: true, title: "Drop Location" }).addTo(mapInstance);
-                }
-                updateMarkerPopup(dropMarker, "Drop: " + mapDropAddress);
-            }
-
-            updateCoordsBadges();
-
-            if (mapPickupCoords && mapDropCoords) {
-                const group = new L.featureGroup([pickupMarker, dropMarker]);
-                mapInstance.fitBounds(group.getBounds().pad(0.15));
-            } else {
-                mapInstance.setView([lat, lng], 14);
-            }
-        } else {
-            utils.showAlert(bookingAlert, "No results found for that address.");
-        }
-    } catch (err) {
-        console.error("Geocoding error:", err);
-        utils.showAlert(bookingAlert, "Search failed: " + err.message);
-    }
 }
 
 async function fetchOSRMRoute(pickupCoords, dropCoords) {
@@ -648,39 +586,45 @@ async function handleStep1Submit(e) {
         return;
     }
 
-    // Resolve coordinates
+    // Resolve coordinates and names
     let pickupCoords = null;
     let dropCoords = null;
+    let resolvedPickupName = pickup;
+    let resolvedDropName = drop;
+    const isCustomBooking = (pickup === "Custom Location") || (category !== "rental" && drop === "Custom Location");
 
     if (pickup === "Custom Location") {
-        if (!mapPickupCoords) {
-            utils.showAlert(bookingAlert, "Please select a custom pickup location on the map.");
+        const customText = customPickupAddress.value.trim();
+        if (!customText) {
+            utils.showAlert(bookingAlert, "Please type a custom pickup address.");
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
-        pickupCoords = mapPickupCoords;
-    } else if (pickup && terminalCoordinates[pickup]) {
-        pickupCoords = terminalCoordinates[pickup];
-    }
-
-    if (category === "rental") {
-        dropCoords = null;
+        resolvedPickupName = customText;
     } else {
-        if (drop === "Custom Location") {
-            if (!mapDropCoords) {
-                utils.showAlert(bookingAlert, "Please select a custom drop location on the map.");
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                return;
-            }
-            dropCoords = mapDropCoords;
-        } else if (drop && terminalCoordinates[drop]) {
-            dropCoords = terminalCoordinates[drop];
+        const pickupLoc = dbLocations.find(l => l.name === pickup);
+        if (pickupLoc) {
+            pickupCoords = [pickupLoc.lat, pickupLoc.lng];
         }
     }
 
-    if (!pickupCoords || (category !== "rental" && !dropCoords)) {
-        utils.showAlert(bookingAlert, "Pickup and Destination coordinates could not be resolved.");
-        return;
+    if (category === "rental") {
+        resolvedDropName = "Rental Service (No Drop)";
+    } else {
+        if (drop === "Custom Location") {
+            const customText = customDropAddress.value.trim();
+            if (!customText) {
+                utils.showAlert(bookingAlert, "Please type a custom drop address.");
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            resolvedDropName = customText;
+        } else {
+            const dropLoc = dbLocations.find(l => l.name === drop);
+            if (dropLoc) {
+                dropCoords = [dropLoc.lat, dropLoc.lng];
+            }
+        }
     }
 
     showLoader("Querying fleet inventory & calculating rates...");
@@ -688,34 +632,53 @@ async function handleStep1Submit(e) {
     let distanceKm = 0;
     let polyline = null;
 
-    if (category === "rental") {
+    if (category === "rental" || isCustomBooking) {
         distanceKm = 0;
         polyline = null;
     } else {
-        try {
-            // Query OSRM
-            const routeData = await fetchOSRMRoute(pickupCoords, dropCoords);
-            distanceKm = Math.round(routeData.distance / 1000) || 1;
-            const coords = routeData.geometry.coordinates; // array of [lng, lat]
-            polyline = coords.map(coord => [coord[1], coord[0]]); // convert to [lat, lng]
-        } catch (err) {
-            console.warn("Routing API failed, using fallback metrics:", err.message);
-            
-            // Fallback to Haversine distance
-            distanceKm = getHaversineDistance(pickupCoords, dropCoords);
-            polyline = [pickupCoords, dropCoords]; // Straight-line polyline fallback
+        if (pickupCoords && dropCoords) {
+            try {
+                // Query OSRM
+                const routeData = await fetchOSRMRoute(pickupCoords, dropCoords);
+                distanceKm = Math.round(routeData.distance / 1000) || 1;
+                const coords = routeData.geometry.coordinates; // array of [lng, lat]
+                polyline = coords.map(coord => [coord[1], coord[0]]); // convert to [lat, lng]
+            } catch (err) {
+                console.warn("Routing API failed, using fallback metrics:", err.message);
+                
+                // Fallback to Haversine distance
+                distanceKm = getHaversineDistance(pickupCoords, dropCoords);
+                polyline = [pickupCoords, dropCoords]; // Straight-line polyline fallback
+            }
         }
     }
 
-    // Check if flat metrics are applicable (only if BOTH are NOT custom and we have a matrix match)
+    // Check if flat metrics are applicable (only if BOTH are NOT custom and we have a matrix match in Firestore)
     let metrics = null;
-    if (category !== "rental" && pickup !== "Custom Location" && drop !== "Custom Location") {
-        metrics = getRouteMetrics(pickup, drop);
+    if (category !== "rental" && !isCustomBooking) {
+        try {
+            const flatFareQuery = query(
+                collection(db, "flat_fares"),
+                where("pickup_name", "==", pickup),
+                where("drop_name", "==", drop)
+            );
+            const flatFareSnap = await getDocs(flatFareQuery);
+            if (!flatFareSnap.empty) {
+                const flatFareData = flatFareSnap.docs[0].data();
+                metrics = {
+                    km: flatFareData.km || distanceKm,
+                    base_fare_compact: flatFareData.fares.compact,
+                    base_fare_premium: flatFareData.fares.premium,
+                    base_fare_suv: flatFareData.fares.suv,
+                    base_fare_muv: flatFareData.fares.muv
+                };
+            }
+        } catch (err) {
+            console.warn("Flat fares query failed, falling back to static/dynamic calculation:", err);
+            // Fallback check static routesMatrix
+            metrics = getRouteMetrics(pickup, drop);
+        }
     }
-
-    // Determine resolved pickup and drop display names
-    const resolvedPickupName = pickup === "Custom Location" ? (mapPickupAddress || "Custom Pickup Location") : pickup;
-    const resolvedDropName = category === "rental" ? "Rental Service (No Drop)" : (drop === "Custom Location" ? (mapDropAddress || "Custom Drop Location") : drop);
 
     // Save configuration parameters globally
     currentRouteData = {
@@ -730,18 +693,23 @@ async function handleStep1Submit(e) {
         flatMetrics: metrics,
         pickupCoords: pickupCoords,
         dropCoords: dropCoords,
-        polyline: polyline
+        polyline: polyline,
+        isCustomBooking: isCustomBooking
     };
 
     // Update Step 2 badge distance total
-    routeKmBadge.textContent = `Estimated: ${currentRouteData.km} km`;
+    if (isCustomBooking) {
+        routeKmBadge.textContent = "Estimated: -- km (Custom Route)";
+    } else {
+        routeKmBadge.textContent = `Estimated: ${currentRouteData.km} km`;
+    }
 
-    // Process rates and time-aware inventory availability check for each category (Sedan, SUV, MUV)
+    // Process rates and time-aware inventory availability check for each category (Compact, Premium, SUV, MUV)
     try {
         const ratesResponse = await bookingService.fetchRates();
         const activeRates = ratesResponse.rates;
         activeRatesVersionId = ratesResponse.version_id;
-        const tiers = ["sedan", "suv", "muv"];
+        const tiers = ["compact", "premium", "suv", "muv"];
         
         for (const tier of tiers) {
             const card = document.querySelector(`.car-card[data-tier="${tier}"]`);
@@ -750,7 +718,12 @@ async function handleStep1Submit(e) {
 
             // Calculate fare dynamically
             const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics, currentRouteData.hours, activeRates);
-            fareDisplay.textContent = `₹${fare.toLocaleString("en-IN")}`;
+            
+            if (isCustomBooking) {
+                fareDisplay.innerHTML = `₹${fare.toLocaleString("en-IN")}<span class="block text-[10px] text-slate-500 font-normal">Base Rate</span>`;
+            } else {
+                fareDisplay.textContent = `₹${fare.toLocaleString("en-IN")}`;
+            }
             card.dataset.computedFare = fare;
 
             // Overbooking inventory check
@@ -892,7 +865,14 @@ function navigateToStep3() {
     summaryTier.textContent = selectedVehicleTier.toUpperCase();
     
     // Set base fare & reset promo state
-    summaryBaseFare.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
+    if (currentRouteData.isCustomBooking) {
+        summaryBaseFare.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")} (Base Cost)`;
+        utils.showElement(customFareNotice);
+    } else {
+        summaryBaseFare.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
+        utils.hideElement(customFareNotice);
+    }
+    
     summaryGrandTotal.textContent = `₹${selectedVehicleFare.toLocaleString("en-IN")}`;
     appliedPromo = null;
     promoCodeInput.value = "";

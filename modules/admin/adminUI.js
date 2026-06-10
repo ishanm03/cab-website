@@ -4,7 +4,8 @@ import { auth, db } from "../shared/firebase.js";
 import { authService } from "../auth/authService.js";
 import { utils } from "../shared/utils.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { terminalCoordinates } from "../shared/routesMatrix.js";
+import { terminalCoordinates, routesMatrix } from "../shared/routesMatrix.js";
+import { bookingService } from "../booking/bookingService.js";
 import { 
     collection, 
     query, 
@@ -70,17 +71,64 @@ const viewBookingsTab = document.getElementById("view-bookings-tab");
 const viewFleetTab = document.getElementById("view-fleet-tab");
 const viewDriversTab = document.getElementById("view-drivers-tab");
 const viewSettingsTab = document.getElementById("view-settings-tab");
+const viewLocationsTab = document.getElementById("view-locations-tab");
+
 const panelBookings = document.getElementById("panel-bookings");
 const panelFleet = document.getElementById("panel-fleet");
 const panelDrivers = document.getElementById("panel-drivers");
 const panelSettings = document.getElementById("panel-settings");
+const panelLocations = document.getElementById("panel-locations");
+
+// Manage Locations inputs
+const addLocationForm = document.getElementById("add-location-form");
+const locationName = document.getElementById("location-name");
+const locationType = document.getElementById("location-type");
+const locationLat = document.getElementById("location-lat");
+const locationLng = document.getElementById("location-lng");
+const locationMapSearch = document.getElementById("location-map-search");
+const btnLocationMapSearch = document.getElementById("btn-location-map-search");
+const locationsListTbody = document.getElementById("locations-list-tbody");
+
+const flatFareForm = document.getElementById("flat-fare-form");
+const flatFarePickup = document.getElementById("flat-fare-pickup");
+const flatFareDrop = document.getElementById("flat-fare-drop");
+const flatFareCompact = document.getElementById("flat-fare-compact");
+const flatFarePremium = document.getElementById("flat-fare-premium");
+const flatFareSuv = document.getElementById("flat-fare-suv");
+const flatFareMuv = document.getElementById("flat-fare-muv");
+const flatFaresListTbody = document.getElementById("flat-fares-list-tbody");
+
+let locationMapInstance = null;
+let locationMapMarker = null;
+
+// Approve Modal Geocoding Elements
+const approveMapSection = document.getElementById("approve-map-section");
+const approvePickupAddressText = document.getElementById("approve-pickup-address-text");
+const approveDropAddressText = document.getElementById("approve-drop-address-text");
+const approveMapSearchInput = document.getElementById("approve-map-search-input");
+const btnApproveMapSearch = document.getElementById("btn-approve-map-search");
+const approvePickupCoordsBadge = document.getElementById("approve-pickup-coords-badge");
+const approveDropCoordsBadge = document.getElementById("approve-drop-coords-badge");
+const approveSaveCoords = document.getElementById("approve-save-coords");
+
+let approveMapInstance = null;
+let approvePickupMarker = null;
+let approveDropMarker = null;
+let approvePickupCoords = null; // [lat, lng]
+let approveDropCoords = null;   // [lat, lng]
+
 
 // Fleet inventory elements
+const vehicleModal = document.getElementById("vehicle-modal");
+const btnAddVehicleTrigger = document.getElementById("btn-add-vehicle-trigger");
+const btnCloseVehicle = document.getElementById("btn-close-vehicle");
 const vehicleForm = document.getElementById("vehicle-form");
 const vehicleEditId = document.getElementById("vehicle-edit-id");
 const vehicleModel = document.getElementById("vehicle-model");
 const vehiclePlate = document.getElementById("vehicle-plate");
 const vehicleTier = document.getElementById("vehicle-tier");
+const vehiclePassengers = document.getElementById("vehicle-passengers");
+const vehicleAddress = document.getElementById("vehicle-address");
 const vehicleStatus = document.getElementById("vehicle-status");
 const vehicleDriver = document.getElementById("vehicle-driver");
 const btnSaveVehicle = document.getElementById("btn-save-vehicle");
@@ -89,9 +137,13 @@ const btnSeedFleet = document.getElementById("btn-seed-fleet");
 const fleetInventoryTbody = document.getElementById("fleet-inventory-tbody");
 
 // Driver registry elements
+const driverModal = document.getElementById("driver-modal");
+const btnAddDriverTrigger = document.getElementById("btn-add-driver-trigger");
+const btnCloseDriver = document.getElementById("btn-close-driver");
 const driverForm = document.getElementById("driver-form");
 const driverEditId = document.getElementById("driver-edit-id");
 const driverName = document.getElementById("driver-name");
+const driverAddress = document.getElementById("driver-address");
 const driverPhone = document.getElementById("driver-phone");
 const driverLicense = document.getElementById("driver-license");
 const driverStatus = document.getElementById("driver-status");
@@ -102,10 +154,15 @@ const driverRegistryTbody = document.getElementById("driver-registry-tbody");
 
 // Fares Configuration Form
 const faresMatrixForm = document.getElementById("fares-matrix-form");
-const fareSedanBase = document.getElementById("fare-sedan-base");
-const fareSedanKm = document.getElementById("fare-sedan-km");
-const fareSedanHour = document.getElementById("fare-sedan-hour");
-const fareSedanAllowance = document.getElementById("fare-sedan-allowance");
+const fareCompactBase = document.getElementById("fare-compact-base");
+const fareCompactKm = document.getElementById("fare-compact-km");
+const fareCompactHour = document.getElementById("fare-compact-hour");
+const fareCompactAllowance = document.getElementById("fare-compact-allowance");
+
+const farePremiumBase = document.getElementById("fare-premium-base");
+const farePremiumKm = document.getElementById("fare-premium-km");
+const farePremiumHour = document.getElementById("fare-premium-hour");
+const farePremiumAllowance = document.getElementById("fare-premium-allowance");
 
 const fareSuvBase = document.getElementById("fare-suv-base");
 const fareSuvKm = document.getElementById("fare-suv-km");
@@ -190,6 +247,30 @@ function initAdminUI() {
     if (btnCancelVehicle) btnCancelVehicle.addEventListener("click", resetVehicleForm);
     if (btnCancelDriver) btnCancelDriver.addEventListener("click", resetDriverForm);
     if (btnSeedFleet) btnSeedFleet.addEventListener("click", seedDefaultFleet);
+
+    // Bind triggers to show/hide Add/Register modals
+    if (btnAddVehicleTrigger) {
+        btnAddVehicleTrigger.addEventListener("click", () => {
+            resetVehicleForm();
+            utils.showElement(vehicleModal);
+        });
+    }
+    if (btnCloseVehicle) {
+        btnCloseVehicle.addEventListener("click", () => {
+            resetVehicleForm();
+        });
+    }
+    if (btnAddDriverTrigger) {
+        btnAddDriverTrigger.addEventListener("click", () => {
+            resetDriverForm();
+            utils.showElement(driverModal);
+        });
+    }
+    if (btnCloseDriver) {
+        btnCloseDriver.addEventListener("click", () => {
+            resetDriverForm();
+        });
+    }
 }
 
 // Security: Force rerouting if user is not authorized as Admin
@@ -208,6 +289,9 @@ async function handleAdminSessionChange(user) {
         // Prefetch settings and promo configuration arrays
         loadFaresMatrix();
         loadPromoOffers();
+
+        // Run self-healing retrospective schema updates
+        runRetrospectiveUpdates();
     } else {
         // Not logged in or not admin -> block access
         console.warn("IshanCabs: Unauthorized admin dashboard access attempt.");
@@ -260,7 +344,8 @@ function loadFleetRoster() {
     if (!approveRosterSelect) return;
 
     const activeRoster = {
-        sedan: [],
+        compact: [],
+        premium: [],
         suv: [],
         muv: []
     };
@@ -627,6 +712,9 @@ function bindCardActionButtonEvents() {
             approveVehicleNumber.value = booking.driver_assignment?.vehicle_number || "";
             approveDiscountOverride.value = booking.fare_details?.discount_amount || "";
 
+            // Initialize geocoding map inside approval modal if it is a custom booking
+            initApproveGeocodeMap(booking);
+
             utils.showElement(approvalModal);
         });
     });
@@ -737,11 +825,78 @@ async function handleApprovalFormSubmit(e) {
         return;
     }
 
+    const booking = bookingsData.find(b => b.id === bookingId);
+    const isCustom = !booking.trip_details.pickup_coords || !booking.trip_details.drop_coords;
+
+    let geocodedData = null;
+    if (isCustom && approveSaveCoords.checked) {
+        if (!approvePickupCoords || !approveDropCoords) {
+            utils.showAlert(adminAlert, "Please select both pickup and drop pin locations on the map or uncheck 'Configure Map Coordinates'.");
+            return;
+        }
+
+        // We can fetch OSRM route right here, BEFORE hiding the modal, so we can alert if OSRM fails or show loading
+        utils.showAlert(adminAlert, "Recalculating route distance...", "success");
+
+        try {
+            const pickupLng = approvePickupCoords[1];
+            const pickupLat = approvePickupCoords[0];
+            const dropLng = approveDropCoords[1];
+            const dropLat = approveDropCoords[0];
+
+            const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropLng},${dropLat}?overview=full&geometries=geojson`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("OSRM route fetch failed");
+            const data = await response.json();
+
+            let distanceKm = 0;
+            let polyline = null;
+            if (data.routes && data.routes.length > 0) {
+                const routeData = data.routes[0];
+                distanceKm = Math.round(routeData.distance / 1000) || 1;
+                const coords = routeData.geometry.coordinates;
+                polyline = coords.map(coord => [coord[1], coord[0]]);
+            } else {
+                throw new Error("No route found in OSRM response");
+            }
+
+            geocodedData = {
+                distanceKm,
+                polyline,
+                pickupCoords: approvePickupCoords,
+                dropCoords: approveDropCoords
+            };
+        } catch (err) {
+            console.warn("OSRM routing failed, using Haversine fallback:", err);
+            // Haversine fallback
+            const pickupLat = approvePickupCoords[0];
+            const pickupLng = approvePickupCoords[1];
+            const dropLat = approveDropCoords[0];
+            const dropLng = approveDropCoords[1];
+
+            const R = 6371; // Earth's radius in km
+            const dLat = (dropLat - pickupLat) * Math.PI / 180;
+            const dLng = (dropLng - pickupLng) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(pickupLat * Math.PI / 180) * Math.cos(dropLat * Math.PI / 180) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distanceKm = Math.ceil(R * c * 1.3);
+            const polyline = [approvePickupCoords, approveDropCoords];
+
+            geocodedData = {
+                distanceKm,
+                polyline,
+                pickupCoords: approvePickupCoords,
+                dropCoords: approveDropCoords
+            };
+        }
+    }
+
     utils.hideElement(approvalModal);
     utils.showAlert(adminAlert, "Allocating driver and confirming ride...", "success");
 
     try {
-        const booking = bookingsData.find(b => b.id === bookingId);
         const discountOverride = parseFloat(approveDiscountOverride.value);
         const updatePayload = {
             status: "confirmed",
@@ -753,19 +908,54 @@ async function handleApprovalFormSubmit(e) {
             updated_ts: serverTimestamp()
         };
 
-        if (!isNaN(discountOverride) && discountOverride >= 0) {
-            const baseFare = (booking.fare_details && typeof booking.fare_details.base_fare === "number")
-                ? booking.fare_details.base_fare
-                : booking.fare_details.estimated_fare;
-            const finalEstimatedFare = Math.max(0, baseFare - discountOverride);
-            
+        if (geocodedData) {
+            // Recalculate fare
+            const ratesResponse = await bookingService.fetchRates();
+            const activeRates = ratesResponse.rates;
+            const calculatedBaseFare = bookingService.calculateFare(
+                booking.trip_details.ride_type,
+                geocodedData.distanceKm,
+                booking.trip_details.outstation_days,
+                booking.fare_details.vehicle_tier,
+                null,
+                booking.trip_details.rental_hours || 0,
+                activeRates
+            );
+
+            const discount = !isNaN(discountOverride) && discountOverride >= 0 ? discountOverride : (booking.fare_details?.discount_amount || 0);
+            const finalEstimatedFare = Math.max(0, calculatedBaseFare - discount);
+
+            updatePayload.trip_details = {
+                ...booking.trip_details,
+                pickup_coords: geocodedData.pickupCoords,
+                drop_coords: geocodedData.dropCoords,
+                route_polyline: JSON.stringify(geocodedData.polyline)
+            };
+
             updatePayload.fare_details = {
                 ...booking.fare_details,
-                base_fare: baseFare,
-                discount_amount: discountOverride,
+                base_fare: calculatedBaseFare,
+                discount_amount: discount,
                 estimated_fare: finalEstimatedFare,
-                promo_code: discountOverride > 0 ? "ADMIN_OVERRIDE" : (booking.fare_details?.promo_code || null)
+                estimated_km: geocodedData.distanceKm,
+                promo_code: discount > 0 ? (discountOverride >= 0 ? "ADMIN_OVERRIDE" : (booking.fare_details?.promo_code || "ADMIN_OVERRIDE")) : (booking.fare_details?.promo_code || null)
             };
+        } else {
+            // Standard flow without new geocoding
+            if (!isNaN(discountOverride) && discountOverride >= 0) {
+                const baseFare = (booking.fare_details && typeof booking.fare_details.base_fare === "number")
+                    ? booking.fare_details.base_fare
+                    : booking.fare_details.estimated_fare;
+                const finalEstimatedFare = Math.max(0, baseFare - discountOverride);
+
+                updatePayload.fare_details = {
+                    ...booking.fare_details,
+                    base_fare: baseFare,
+                    discount_amount: discountOverride,
+                    estimated_fare: finalEstimatedFare,
+                    promo_code: discountOverride > 0 ? "ADMIN_OVERRIDE" : (booking.fare_details?.promo_code || null)
+                };
+            }
         }
 
         const bookingDocRef = doc(db, "bookings", bookingId);
@@ -856,7 +1046,17 @@ function initAdminMap(booking) {
 
     if (!pickupCoords || (booking.trip_details.ride_type !== "rental" && !dropCoords)) {
         console.warn("Could not find coordinates for admin booking map:", booking.id);
-        mapContainer.style.display = "none";
+        mapContainer.style.display = "block";
+        mapContainer.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-center bg-slate-950/80 border border-dashed border-slate-800 text-slate-500 rounded-2xl p-4">
+                <svg class="w-8 h-8 mb-2 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+                <span class="font-bold text-xs text-slate-400">No Map Data</span>
+                <span class="text-[10px] text-slate-500 mt-1">Geocoding required to enable route preview.</span>
+            </div>
+        `;
         return;
     }
 
@@ -929,7 +1129,8 @@ function setupViewSwitchers() {
         { btn: viewBookingsTab, panel: panelBookings },
         { btn: viewFleetTab, panel: panelFleet },
         { btn: viewDriversTab, panel: panelDrivers },
-        { btn: viewSettingsTab, panel: panelSettings }
+        { btn: viewSettingsTab, panel: panelSettings },
+        { btn: viewLocationsTab, panel: panelLocations }
     ];
 
     tabs.forEach(tab => {
@@ -951,6 +1152,10 @@ function setupViewSwitchers() {
             } else if (tab.btn === viewSettingsTab) {
                 loadFaresMatrix();
                 loadPromoOffers();
+            } else if (tab.btn === viewLocationsTab) {
+                initLocationFormMap();
+                loadLocationsList();
+                loadFlatFaresList();
             }
         });
     });
@@ -958,9 +1163,10 @@ function setupViewSwitchers() {
 
 // Static default rates mapping fallback configuration
 const DEFAULT_RATES = {
-    sedan: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
-    suv:   { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
-    muv:   { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
+    compact: { rate_per_km: 10.00, driver_allowance_per_day: 300.00, rate_per_hour: 120.00, base_cost: 250.00 },
+    premium: { rate_per_km: 12.00, driver_allowance_per_day: 300.00, rate_per_hour: 150.00, base_cost: 300.00 },
+    suv:     { rate_per_km: 15.00, driver_allowance_per_day: 400.00, rate_per_hour: 200.00, base_cost: 500.00 },
+    muv:     { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
 };
 
 async function loadFaresMatrix() {
@@ -974,11 +1180,17 @@ async function loadFaresMatrix() {
             rates = docSnap.data().rates;
         }
         
-        // Hydrate Sedan Tier inputs
-        fareSedanBase.value = rates.sedan?.base_cost ?? 300;
-        fareSedanKm.value = rates.sedan?.rate_per_km ?? 12.00;
-        fareSedanHour.value = rates.sedan?.rate_per_hour ?? 150.00;
-        fareSedanAllowance.value = rates.sedan?.driver_allowance_per_day ?? 300.00;
+        // Hydrate Compact Tier inputs
+        fareCompactBase.value = rates.compact?.base_cost ?? 250;
+        fareCompactKm.value = rates.compact?.rate_per_km ?? 10.00;
+        fareCompactHour.value = rates.compact?.rate_per_hour ?? 120.00;
+        fareCompactAllowance.value = rates.compact?.driver_allowance_per_day ?? 300.00;
+
+        // Hydrate Premium Tier inputs
+        farePremiumBase.value = rates.premium?.base_cost ?? 300;
+        farePremiumKm.value = rates.premium?.rate_per_km ?? 12.00;
+        farePremiumHour.value = rates.premium?.rate_per_hour ?? 150.00;
+        farePremiumAllowance.value = rates.premium?.driver_allowance_per_day ?? 300.00;
 
         // Hydrate SUV Tier inputs
         fareSuvBase.value = rates.suv?.base_cost ?? 500;
@@ -1004,11 +1216,17 @@ async function handleFaresFormSubmit(e) {
     utils.showAlert(adminAlert, "Saving fare parameters dynamically...", "success");
 
     const newRates = {
-        sedan: {
-            base_cost: parseFloat(fareSedanBase.value) || 0,
-            rate_per_km: parseFloat(fareSedanKm.value) || 0,
-            rate_per_hour: parseFloat(fareSedanHour.value) || 0,
-            driver_allowance_per_day: parseFloat(fareSedanAllowance.value) || 0
+        compact: {
+            base_cost: parseFloat(fareCompactBase.value) || 0,
+            rate_per_km: parseFloat(fareCompactKm.value) || 0,
+            rate_per_hour: parseFloat(fareCompactHour.value) || 0,
+            driver_allowance_per_day: parseFloat(fareCompactAllowance.value) || 0
+        },
+        premium: {
+            base_cost: parseFloat(farePremiumBase.value) || 0,
+            rate_per_km: parseFloat(farePremiumKm.value) || 0,
+            rate_per_hour: parseFloat(farePremiumHour.value) || 0,
+            driver_allowance_per_day: parseFloat(farePremiumAllowance.value) || 0
         },
         suv: {
             base_cost: parseFloat(fareSuvBase.value) || 0,
@@ -1244,7 +1462,7 @@ function renderFleetInventory() {
     if (vehiclesData.length === 0) {
         fleetInventoryTbody.innerHTML = `
             <tr>
-                <td colspan="6" class="py-8 text-center text-slate-500 italic">No vehicles registered yet. Click seed defaults to test quickly.</td>
+                <td colspan="8" class="py-8 text-center text-slate-500 italic">No vehicles registered yet. Click seed defaults to test quickly.</td>
             </tr>
         `;
         utils.showElement(btnSeedFleet);
@@ -1263,7 +1481,8 @@ function renderFleetInventory() {
         }
 
         let tierBadgeClass = "bg-slate-800 text-slate-350";
-        if (vehicle.tier === "sedan") tierBadgeClass = "bg-blue-500/10 border border-blue-500/20 text-blue-400";
+        if (vehicle.tier === "compact") tierBadgeClass = "bg-teal-500/10 border border-teal-500/20 text-teal-400";
+        if (vehicle.tier === "premium") tierBadgeClass = "bg-blue-500/10 border border-blue-500/20 text-blue-400";
         if (vehicle.tier === "suv") tierBadgeClass = "bg-amber-500/10 border border-amber-500/20 text-amber-400";
         if (vehicle.tier === "muv") tierBadgeClass = "bg-purple-500/10 border border-purple-500/20 text-purple-400";
 
@@ -1277,6 +1496,8 @@ function renderFleetInventory() {
             <td class="py-4 px-5">
                 <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${tierBadgeClass} uppercase">${vehicle.tier}</span>
             </td>
+            <td class="py-4 px-5 text-slate-300">${vehicle.passengers || 4} Pax</td>
+            <td class="py-4 px-5 text-slate-400 text-xs truncate max-w-[150px]" title="${vehicle.address || 'Unspecified'}">${vehicle.address || 'Unspecified'}</td>
             <td class="py-4 px-5 text-slate-400">${driverNameStr}</td>
             <td class="py-4 px-5">
                 <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass} uppercase">${vehicle.status}</span>
@@ -1299,7 +1520,7 @@ function renderDriverRegistry() {
     if (driversData.length === 0) {
         driverRegistryTbody.innerHTML = `
             <tr>
-                <td colspan="6" class="py-8 text-center text-slate-500 italic">No drivers registered yet. Register drivers on the left.</td>
+                <td colspan="7" class="py-8 text-center text-slate-500 italic">No drivers registered yet. Register drivers on the left.</td>
             </tr>
         `;
         return;
@@ -1323,6 +1544,7 @@ function renderDriverRegistry() {
         tr.innerHTML = `
             <td class="py-4 px-5 font-bold text-white">${driver.name}</td>
             <td class="py-4 px-5 text-slate-300 font-mono">${driver.phone}</td>
+            <td class="py-4 px-5 text-slate-400 text-xs truncate max-w-[150px]" title="${driver.address || 'Unspecified'}">${driver.address || 'Unspecified'}</td>
             <td class="py-4 px-5 text-slate-300 uppercase">${driver.license_number}</td>
             <td class="py-4 px-5 text-slate-400">${vehicleStr}</td>
             <td class="py-4 px-5">
@@ -1400,6 +1622,8 @@ async function handleVehicleFormSubmit(e) {
     const modelVal = vehicleModel.value.trim();
     const plateVal = vehiclePlate.value.trim().toUpperCase().replace(/\s+/g, '-');
     const tierVal = vehicleTier.value;
+    const passengersVal = parseInt(vehiclePassengers.value) || 4;
+    const addressVal = vehicleAddress.value.trim();
     const statusVal = vehicleStatus.value;
     const driverIdVal = vehicleDriver.value; 
     const editId = vehicleEditId.value;
@@ -1427,6 +1651,8 @@ async function handleVehicleFormSubmit(e) {
             model: modelVal,
             plate_number: plateVal,
             tier: tierVal,
+            passengers: passengersVal,
+            address: addressVal,
             status: statusVal,
             assigned_driver_id: driverIdVal || null,
             creation_ts: serverTimestamp()
@@ -1486,6 +1712,7 @@ async function handleDriverFormSubmit(e) {
     if (!db) return;
 
     const nameVal = driverName.value.trim();
+    const addressVal = driverAddress.value.trim();
     const phoneVal = driverPhone.value.trim();
     const licenseVal = driverLicense.value.trim().toUpperCase();
     const statusVal = driverStatus.value;
@@ -1513,6 +1740,7 @@ async function handleDriverFormSubmit(e) {
 
         const driverPayload = {
             name: nameVal,
+            address: addressVal,
             phone: phoneVal,
             license_number: licenseVal,
             status: statusVal,
@@ -1579,6 +1807,8 @@ function bindFleetActionButtons() {
                 vehicleModel.value = vehicle.model;
                 vehiclePlate.value = vehicle.plate_number;
                 vehicleTier.value = vehicle.tier;
+                vehiclePassengers.value = vehicle.passengers || "";
+                vehicleAddress.value = vehicle.address || "";
                 vehicleStatus.value = vehicle.status;
                 
                 populateAssociationDropdowns(vehicle.id, null);
@@ -1586,6 +1816,7 @@ function bindFleetActionButtons() {
 
                 document.getElementById("fleet-form-title").textContent = "Edit Vehicle";
                 utils.showElement(btnCancelVehicle);
+                utils.showElement(vehicleModal);
             }
         });
     });
@@ -1628,6 +1859,7 @@ function bindDriverActionButtons() {
                 driverName.value = driver.name;
                 driverPhone.value = driver.phone;
                 driverLicense.value = driver.license_number;
+                driverAddress.value = driver.address || "";
                 driverStatus.value = driver.status;
 
                 populateAssociationDropdowns(null, driver.id);
@@ -1635,6 +1867,7 @@ function bindDriverActionButtons() {
 
                 document.getElementById("driver-form-title").textContent = "Edit Driver";
                 utils.showElement(btnCancelDriver);
+                utils.showElement(driverModal);
             }
         });
     });
@@ -1670,23 +1903,28 @@ function resetVehicleForm() {
     vehicleEditId.value = "";
     vehicleModel.value = "";
     vehiclePlate.value = "";
-    vehicleTier.value = "sedan";
+    vehicleTier.value = "premium";
+    vehiclePassengers.value = "";
+    vehicleAddress.value = "";
     vehicleStatus.value = "active";
     vehicleDriver.value = "";
     document.getElementById("fleet-form-title").textContent = "Add Vehicle";
     utils.hideElement(btnCancelVehicle);
+    if (vehicleModal) utils.hideElement(vehicleModal);
     populateAssociationDropdowns();
 }
 
 function resetDriverForm() {
     driverEditId.value = "";
     driverName.value = "";
+    driverAddress.value = "";
     driverPhone.value = "";
     driverLicense.value = "";
     driverStatus.value = "active";
     driverVehicle.value = "";
     document.getElementById("driver-form-title").textContent = "Register Driver";
     utils.hideElement(btnCancelDriver);
+    if (driverModal) utils.hideElement(driverModal);
     populateAssociationDropdowns();
 }
 
@@ -1699,7 +1937,8 @@ async function seedDefaultFleet() {
         const dummyData = await response.json();
 
         const modelMapping = {
-            sedan: "Maruti Swift Dzire",
+            compact: "Maruti Alto K10",
+            premium: "Maruti Swift Dzire",
             suv: "Hyundai Creta",
             muv: "Toyota Innova"
         };
@@ -1723,6 +1962,8 @@ async function seedDefaultFleet() {
                     tier: tier,
                     status: "active",
                     assigned_driver_id: driverId,
+                    passengers: tier === "compact" ? 4 : (tier === "premium" ? 4 : (tier === "suv" ? 6 : 12)),
+                    address: "Main Garage, Kolkata",
                     creation_ts: serverTimestamp()
                 });
 
@@ -1733,6 +1974,7 @@ async function seedDefaultFleet() {
                     license_number: randomLicenseNum,
                     status: "active",
                     assigned_vehicle_id: vehicleId,
+                    address: "Kolkata City Depot",
                     creation_ts: serverTimestamp()
                 });
 
@@ -1744,6 +1986,683 @@ async function seedDefaultFleet() {
     } catch (err) {
         console.error("Seeding failed:", err);
         utils.showAlert(adminAlert, "Seeding inventory failed: " + err.message);
+    }
+}
+
+async function runRetrospectiveUpdates() {
+    if (!db) return;
+    try {
+        const vehiclesSnap = await getDocs(collection(db, "vehicles"));
+        let updatedCount = 0;
+        for (const docSnap of vehiclesSnap.docs) {
+            const data = docSnap.data();
+            let needsUpdate = false;
+            const updatePayload = {};
+
+            // 1. Rename sedan to premium
+            if (data.tier === "sedan") {
+                updatePayload.tier = "premium";
+                needsUpdate = true;
+            }
+
+            // 2. Set default passengers based on tier (existing: Sedan/Premium-4, SUV-6, MUV-12)
+            if (data.passengers === undefined) {
+                const currentTier = updatePayload.tier || data.tier;
+                if (currentTier === "premium" || currentTier === "sedan") {
+                    updatePayload.passengers = 4;
+                } else if (currentTier === "suv") {
+                    updatePayload.passengers = 6;
+                } else if (currentTier === "muv") {
+                    updatePayload.passengers = 12;
+                } else {
+                    updatePayload.passengers = 4;
+                }
+                needsUpdate = true;
+            }
+
+            // 3. Set default address if missing
+            if (data.address === undefined) {
+                updatePayload.address = "Main Garage, Kolkata";
+                needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+                await updateDoc(docSnap.ref, updatePayload);
+                updatedCount++;
+            }
+        }
+        if (updatedCount > 0) {
+            console.log(`[Retrospective Sync] Successfully updated ${updatedCount} vehicles with new schema fields.`);
+        }
+
+        // Also check drivers for address
+        const driversSnap = await getDocs(collection(db, "drivers"));
+        let driversUpdatedCount = 0;
+        for (const docSnap of driversSnap.docs) {
+            const data = docSnap.data();
+            if (data.address === undefined) {
+                await updateDoc(docSnap.ref, {
+                    address: "Kolkata City Depot"
+                });
+                driversUpdatedCount++;
+            }
+        }
+        if (driversUpdatedCount > 0) {
+            console.log(`[Retrospective Sync] Successfully updated ${driversUpdatedCount} drivers with default address.`);
+        }
+
+        // Check if settings/rates has the new compact rate and updated premium name
+        const ratesDocRef = doc(db, "settings", "rates");
+        const ratesSnap = await getDoc(ratesDocRef);
+        if (ratesSnap.exists()) {
+            const ratesData = ratesSnap.data();
+            let ratesNeedUpdate = false;
+            const newRates = { ...ratesData.rates };
+
+            // Rename sedan to premium if present
+            if (ratesData.rates?.sedan && !ratesData.rates?.premium) {
+                newRates.premium = ratesData.rates.sedan;
+                delete newRates.sedan;
+                ratesNeedUpdate = true;
+            }
+
+            // Add compact if missing
+            if (!ratesData.rates?.compact) {
+                newRates.compact = {
+                    base_cost: 250,
+                    rate_per_km: 10.00,
+                    rate_per_hour: 120.00,
+                    driver_allowance_per_day: 300.00
+                };
+                ratesNeedUpdate = true;
+            }
+
+            if (ratesNeedUpdate) {
+                await updateDoc(ratesDocRef, {
+                    rates: newRates
+                });
+                console.log(`[Retrospective Sync] Updated fare matrix settings to include Compact and Premium Ride.`);
+            }
+        }
+
+        // 4. Seed Predefined Locations if empty
+        const locationsSnap = await getDocs(collection(db, "locations"));
+        if (locationsSnap.empty) {
+            console.log("[Retrospective Sync] Seeding predefined locations into Firestore...");
+            for (const [name, coords] of Object.entries(terminalCoordinates)) {
+                const locId = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+                const docRef = doc(db, "locations", locId);
+                await setDoc(docRef, {
+                    id: locId,
+                    name: name,
+                    lat: coords[0],
+                    lng: coords[1],
+                    type: "both",
+                    creation_ts: serverTimestamp()
+                });
+            }
+            console.log("[Retrospective Sync] Predefined locations seeded successfully.");
+        }
+
+        // 5. Seed Predefined Flat Fares if empty
+        const flatFaresSnap = await getDocs(collection(db, "flat_fares"));
+        if (flatFaresSnap.empty) {
+            console.log("[Retrospective Sync] Seeding predefined flat fares into Firestore...");
+            for (const [pickupName, drops] of Object.entries(routesMatrix)) {
+                const pickupId = pickupName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+                for (const [dropName, metrics] of Object.entries(drops)) {
+                    const dropId = dropName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+                    const combinedId = `${pickupId}_${dropId}`;
+                    const docRef = doc(db, "flat_fares", combinedId);
+                    await setDoc(docRef, {
+                        id: combinedId,
+                        pickup_name: pickupName,
+                        drop_name: dropName,
+                        fares: {
+                            compact: Math.round((metrics.base_fare_sedan || 999) * 0.85),
+                            premium: metrics.base_fare_sedan || 999,
+                            suv: metrics.base_fare_suv || 1499,
+                            muv: Math.round((metrics.base_fare_suv || 1499) * 1.25)
+                        },
+                        creation_ts: serverTimestamp()
+                    });
+                }
+            }
+            console.log("[Retrospective Sync] Predefined flat fares seeded successfully.");
+        }
+    } catch (err) {
+        console.error("[Retrospective Sync] Error running schema updates:", err);
+    }
+}
+
+// =========================================================================
+// PREDEFINED LOCATIONS & FLAT FARES CRUD MANAGEMENT
+// =========================================================================
+
+function initLocationFormMap() {
+    const kolkataCenter = [22.5726, 88.3639];
+
+    if (!locationMapInstance) {
+        // Initialize Map
+        locationMapInstance = L.map('location-form-map').setView(kolkataCenter, 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(locationMapInstance);
+
+        // Map Click Listener
+        locationMapInstance.on('click', (e) => {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            updateLocationFormMarker(lat, lng);
+        });
+
+        // Search Handlers
+        btnLocationMapSearch.addEventListener("click", handleLocationMapSearch);
+        locationMapSearch.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleLocationMapSearch();
+            }
+        });
+
+        // Form Submission
+        addLocationForm.addEventListener("submit", handleAddLocationSubmit);
+        flatFareForm.addEventListener("submit", handleFlatFareSubmit);
+    } else {
+        setTimeout(() => {
+            locationMapInstance.invalidateSize();
+        }, 100);
+    }
+}
+
+function updateLocationFormMarker(lat, lng) {
+    locationLat.value = lat.toFixed(6);
+    locationLng.value = lng.toFixed(6);
+
+    if (locationMapMarker) {
+        locationMapMarker.setLatLng([lat, lng]);
+    } else {
+        locationMapMarker = L.marker([lat, lng], { draggable: true }).addTo(locationMapInstance);
+        locationMapMarker.on('dragend', () => {
+            const pos = locationMapMarker.getLatLng();
+            locationLat.value = pos.lat.toFixed(6);
+            locationLng.value = pos.lng.toFixed(6);
+        });
+    }
+}
+
+async function handleLocationMapSearch() {
+    const queryStr = locationMapSearch.value.trim();
+    if (!queryStr) return;
+
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryStr)}&limit=1`, {
+            headers: { 'Accept-Language': 'en' }
+        });
+        if (!response.ok) throw new Error("Search request failed");
+        const results = await response.json();
+        if (results && results.length > 0) {
+            const lat = parseFloat(results[0].lat);
+            const lng = parseFloat(results[0].lon);
+            
+            locationMapInstance.setView([lat, lng], 14);
+            updateLocationFormMarker(lat, lng);
+        } else {
+            alert("No locations found for your search query.");
+        }
+    } catch (err) {
+        console.error("Geocoding search failed:", err);
+        alert("Search failed: " + err.message);
+    }
+}
+
+async function handleAddLocationSubmit(e) {
+    e.preventDefault();
+    const name = locationName.value.trim();
+    const type = locationType.value;
+    const lat = parseFloat(locationLat.value);
+    const lng = parseFloat(locationLng.value);
+
+    if (!name || isNaN(lat) || isNaN(lng)) {
+        utils.showAlert(adminAlert, "Please fill out all fields and select a point on the map.");
+        return;
+    }
+
+    const locId = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    
+    utils.showAlert(adminAlert, "Saving predefined location...", "success");
+
+    try {
+        await setDoc(doc(db, "locations", locId), {
+            id: locId,
+            name: name,
+            type: type,
+            lat: lat,
+            lng: lng,
+            creation_ts: serverTimestamp()
+        });
+
+        utils.showAlert(adminAlert, `Successfully saved predefined location: ${name}!`, "success");
+        
+        // Reset form
+        locationName.value = "";
+        locationType.value = "both";
+        locationLat.value = "";
+        locationLng.value = "";
+        locationMapSearch.value = "";
+        if (locationMapMarker) {
+            locationMapInstance.removeLayer(locationMapMarker);
+            locationMapMarker = null;
+        }
+    } catch (error) {
+        console.error("Failed to add location:", error);
+        utils.showAlert(adminAlert, "Failed to save location: " + error.message);
+    }
+}
+
+async function handleFlatFareSubmit(e) {
+    e.preventDefault();
+    const pickupName = flatFarePickup.value;
+    const dropName = flatFareDrop.value;
+    const compactVal = parseInt(flatFareCompact.value);
+    const premiumVal = parseInt(flatFarePremium.value);
+    const suvVal = parseInt(flatFareSuv.value);
+    const muvVal = parseInt(flatFareMuv.value);
+
+    if (!pickupName || !dropName || isNaN(compactVal) || isNaN(premiumVal) || isNaN(suvVal) || isNaN(muvVal)) {
+        utils.showAlert(adminAlert, "Please specify route endpoints and fares for all categories.");
+        return;
+    }
+
+    if (pickupName === dropName) {
+        utils.showAlert(adminAlert, "Pickup and drop locations cannot be identical.");
+        return;
+    }
+
+    const pickupId = pickupName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    const dropId = dropName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    const combinedId = `${pickupId}_${dropId}`;
+
+    utils.showAlert(adminAlert, "Saving flat fare override...", "success");
+
+    try {
+        await setDoc(doc(db, "flat_fares", combinedId), {
+            id: combinedId,
+            pickup_name: pickupName,
+            drop_name: dropName,
+            fares: {
+                compact: compactVal,
+                premium: premiumVal,
+                suv: suvVal,
+                muv: muvVal
+            },
+            creation_ts: serverTimestamp()
+        });
+
+        utils.showAlert(adminAlert, `Flat fare override configured for route: ${pickupName} to ${dropName}!`, "success");
+        
+        // Reset form
+        flatFareCompact.value = "";
+        flatFarePremium.value = "";
+        flatFareSuv.value = "";
+        flatFareMuv.value = "";
+        flatFarePickup.value = "";
+        flatFareDrop.value = "";
+    } catch (error) {
+        console.error("Failed to save flat fare:", error);
+        utils.showAlert(adminAlert, "Failed to save flat fare: " + error.message);
+    }
+}
+
+let activeLocationsListener = null;
+function loadLocationsList() {
+    if (activeLocationsListener) activeLocationsListener();
+
+    activeLocationsListener = onSnapshot(query(collection(db, "locations"), orderBy("name")), (snapshot) => {
+        locationsListTbody.innerHTML = "";
+        
+        // Hydrate dropdown selects
+        const pickupOpts = ['<option value="" disabled selected>Select Pickup Location</option>'];
+        const dropOpts = ['<option value="" disabled selected>Select Drop Location</option>'];
+
+        snapshot.forEach(docSnap => {
+            const loc = docSnap.data();
+            
+            const tr = document.createElement("tr");
+            tr.className = "border-b border-slate-800/40 hover:bg-slate-900/10 transition-colors";
+            
+            let typeBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Both</span>`;
+            if (loc.type === "pickup") {
+                typeBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Pickup Only</span>`;
+            } else if (loc.type === "drop") {
+                typeBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Drop Only</span>`;
+            }
+
+            tr.innerHTML = `
+                <td class="py-3 font-semibold text-white">${loc.name}</td>
+                <td class="py-3">${typeBadge}</td>
+                <td class="py-3 font-mono text-slate-400">${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</td>
+                <td class="py-3 text-right">
+                    <button type="button" class="btn-delete-location text-rose-400 hover:text-rose-300 font-bold hover:underline" data-id="${loc.id}">Delete</button>
+                </td>
+            `;
+            locationsListTbody.appendChild(tr);
+
+            // Hydrate flat fare config selects
+            if (loc.type === "pickup" || loc.type === "both") {
+                pickupOpts.push(`<option value="${loc.name}">${loc.name}</option>`);
+            }
+            if (loc.type === "drop" || loc.type === "both") {
+                dropOpts.push(`<option value="${loc.name}">${loc.name}</option>`);
+            }
+        });
+
+        flatFarePickup.innerHTML = pickupOpts.join("");
+        flatFareDrop.innerHTML = dropOpts.join("");
+
+        // Bind deletes
+        document.querySelectorAll(".btn-delete-location").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id");
+                if (confirm("Are you sure you want to delete this predefined location? This will disable matching routes and flat fares.")) {
+                    utils.showAlert(adminAlert, "Deleting location...", "success");
+                    try {
+                        await deleteDoc(doc(db, "locations", id));
+                        utils.showAlert(adminAlert, "Location deleted successfully.", "success");
+                    } catch (error) {
+                        utils.showAlert(adminAlert, "Delete failed: " + error.message);
+                    }
+                }
+            });
+        });
+    }, (error) => {
+        console.error("Locations listener failed:", error);
+    });
+}
+
+let activeFlatFaresListener = null;
+function loadFlatFaresList() {
+    if (activeFlatFaresListener) activeFlatFaresListener();
+
+    activeFlatFaresListener = onSnapshot(query(collection(db, "flat_fares"), orderBy("pickup_name")), (snapshot) => {
+        flatFaresListTbody.innerHTML = "";
+        snapshot.forEach(docSnap => {
+            const fareDoc = docSnap.data();
+            
+            const tr = document.createElement("tr");
+            tr.className = "border-b border-slate-800/40 hover:bg-slate-900/10 transition-colors";
+            
+            tr.innerHTML = `
+                <td class="py-3 font-semibold text-white">
+                    <div class="flex items-center gap-1">
+                        <span class="text-slate-300">${fareDoc.pickup_name}</span>
+                        <span class="text-amber-500">→</span>
+                        <span class="text-slate-300">${fareDoc.drop_name}</span>
+                    </div>
+                </td>
+                <td class="py-3 text-center text-slate-300 font-medium">₹${fareDoc.fares.compact}</td>
+                <td class="py-3 text-center text-slate-300 font-medium">₹${fareDoc.fares.premium}</td>
+                <td class="py-3 text-center text-slate-300 font-medium">₹${fareDoc.fares.suv}</td>
+                <td class="py-3 text-center text-slate-300 font-medium">₹${fareDoc.fares.muv}</td>
+                <td class="py-3 text-right">
+                    <button type="button" class="btn-delete-flatfare text-rose-400 hover:text-rose-300 font-bold hover:underline" data-id="${fareDoc.id}">Delete</button>
+                </td>
+            `;
+            flatFaresListTbody.appendChild(tr);
+        });
+
+        // Bind deletes
+        document.querySelectorAll(".btn-delete-flatfare").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id");
+                if (confirm("Are you sure you want to delete this flat fare override? Driving calculations will fallback OSRM distance pricing.")) {
+                    utils.showAlert(adminAlert, "Deleting override...", "success");
+                    try {
+                        await deleteDoc(doc(db, "flat_fares", id));
+                        utils.showAlert(adminAlert, "Flat fare override deleted successfully.", "success");
+                    } catch (error) {
+                        utils.showAlert(adminAlert, "Delete failed: " + error.message);
+                    }
+                }
+            });
+        });
+    }, (error) => {
+        console.error("Flat fares listener failed:", error);
+    });
+}
+
+// =========================================================================
+// APPROVE MODAL CUSTOM GEOCIDING IMPLEMENTATION
+// =========================================================================
+
+function initApproveGeocodeMap(booking) {
+    const isCustom = !booking.trip_details.pickup_coords || !booking.trip_details.drop_coords;
+
+    if (!isCustom) {
+        approveMapSection.classList.add("hidden");
+        return;
+    }
+
+    approveMapSection.classList.remove("hidden");
+
+    approvePickupAddressText.textContent = booking.trip_details.pickup_location || "Custom Pickup Address";
+    approveDropAddressText.textContent = booking.trip_details.drop_location || "Custom Drop Address";
+    
+    approveMapSearchInput.value = "";
+    approveSaveCoords.checked = true;
+
+    approvePickupCoords = null;
+    approveDropCoords = null;
+    if (approvePickupMarker) {
+        if (approveMapInstance) approveMapInstance.removeLayer(approvePickupMarker);
+        approvePickupMarker = null;
+    }
+    if (approveDropMarker) {
+        if (approveMapInstance) approveMapInstance.removeLayer(approveDropMarker);
+        approveDropMarker = null;
+    }
+
+    const kolkataCenter = [22.5726, 88.3639];
+
+    if (!approveMapInstance) {
+        approveMapInstance = L.map('approve-map').setView(kolkataCenter, 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(approveMapInstance);
+
+        approveMapInstance.on('click', (e) => {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const target = document.querySelector('input[name="approve-search-target"]:checked')?.value || "pickup";
+            if (target === "pickup") {
+                approvePickupCoords = [lat, lng];
+                if (approvePickupMarker) {
+                    approvePickupMarker.setLatLng(e.latlng);
+                } else {
+                    approvePickupMarker = L.marker(approvePickupCoords, { draggable: true }).addTo(approveMapInstance);
+                    approvePickupMarker.on('dragend', () => {
+                        const pos = approvePickupMarker.getLatLng();
+                        approvePickupCoords = [pos.lat, pos.lng];
+                        updateApproveCoordsBadges();
+                    });
+                }
+            } else {
+                approveDropCoords = [lat, lng];
+                if (approveDropMarker) {
+                    approveDropMarker.setLatLng(e.latlng);
+                } else {
+                    approveDropMarker = L.marker(approveDropCoords, { draggable: true }).addTo(approveMapInstance);
+                    approveDropMarker.on('dragend', () => {
+                        const pos = approveDropMarker.getLatLng();
+                        approveDropCoords = [pos.lat, pos.lng];
+                        updateApproveCoordsBadges();
+                    });
+                }
+            }
+            updateApproveCoordsBadges();
+        });
+
+        btnApproveMapSearch.addEventListener("click", handleApproveMapSearch);
+        approveMapSearchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleApproveMapSearch();
+            }
+        });
+    } else {
+        approveMapInstance.setView(kolkataCenter, 12);
+    }
+
+    setTimeout(() => {
+        if (approveMapInstance) approveMapInstance.invalidateSize();
+    }, 200);
+
+    geocodeAndPositionMarkers(booking.trip_details.pickup_location, booking.trip_details.drop_location);
+}
+
+function updateApproveCoordsBadges() {
+    if (approvePickupCoords) {
+        approvePickupCoordsBadge.textContent = `Pickup: ${approvePickupCoords[0].toFixed(4)}, ${approvePickupCoords[1].toFixed(4)}`;
+    } else {
+        approvePickupCoordsBadge.textContent = "Pickup: --, --";
+    }
+
+    if (approveDropCoords) {
+        approveDropCoordsBadge.textContent = `Drop: ${approveDropCoords[0].toFixed(4)}, ${approveDropCoords[1].toFixed(4)}`;
+    } else {
+        approveDropCoordsBadge.textContent = "Drop: --, --";
+    }
+}
+
+async function handleApproveMapSearch() {
+    const queryStr = approveMapSearchInput.value.trim();
+    if (!queryStr) return;
+
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryStr)}&limit=1`, {
+            headers: { 'Accept-Language': 'en' }
+        });
+        if (!response.ok) throw new Error("Search request failed");
+        const results = await response.json();
+        if (results && results.length > 0) {
+            const lat = parseFloat(results[0].lat);
+            const lng = parseFloat(results[0].lon);
+            
+            approveMapInstance.setView([lat, lng], 14);
+            const target = document.querySelector('input[name="approve-search-target"]:checked')?.value || "pickup";
+            if (target === "pickup") {
+                approvePickupCoords = [lat, lng];
+                if (approvePickupMarker) {
+                    approvePickupMarker.setLatLng([lat, lng]);
+                } else {
+                    approvePickupMarker = L.marker([lat, lng], { draggable: true }).addTo(approveMapInstance);
+                    approvePickupMarker.on('dragend', () => {
+                        const pos = approvePickupMarker.getLatLng();
+                        approvePickupCoords = [pos.lat, pos.lng];
+                        updateApproveCoordsBadges();
+                    });
+                }
+            } else {
+                approveDropCoords = [lat, lng];
+                if (approveDropMarker) {
+                    approveDropMarker.setLatLng([lat, lng]);
+                } else {
+                    approveDropMarker = L.marker([lat, lng], { draggable: true }).addTo(approveMapInstance);
+                    approveDropMarker.on('dragend', () => {
+                        const pos = approveDropMarker.getLatLng();
+                        approveDropCoords = [pos.lat, pos.lng];
+                        updateApproveCoordsBadges();
+                    });
+                }
+            }
+            updateApproveCoordsBadges();
+        } else {
+            alert("No locations found for your search query.");
+        }
+    } catch (err) {
+        console.error("Geocoding search failed:", err);
+        alert("Search failed: " + err.message);
+    }
+}
+
+async function geocodeAndPositionMarkers(pickupText, dropText) {
+    updateApproveCoordsBadges();
+
+    let pCoords = null;
+    if (pickupText) {
+        try {
+            const query = encodeURIComponent(pickupText + ", Kolkata, West Bengal, India");
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+                headers: { 'Accept-Language': 'en' }
+            });
+            if (response.ok) {
+                const results = await response.json();
+                if (results && results.length > 0) {
+                    pCoords = [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+                }
+            }
+        } catch (e) {
+            console.error("Auto geocode pickup failed:", e);
+        }
+    }
+
+    let dCoords = null;
+    if (dropText) {
+        try {
+            const query = encodeURIComponent(dropText + ", Kolkata, West Bengal, India");
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+                headers: { 'Accept-Language': 'en' }
+            });
+            if (response.ok) {
+                const results = await response.json();
+                if (results && results.length > 0) {
+                    dCoords = [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+                }
+            }
+        } catch (e) {
+            console.error("Auto geocode drop failed:", e);
+        }
+    }
+
+    if (!pCoords) {
+        pCoords = [22.5726, 88.3639];
+    }
+    if (!dCoords) {
+        dCoords = [22.5833, 88.3414];
+    }
+
+    approvePickupCoords = pCoords;
+    approveDropCoords = dCoords;
+
+    if (approveMapInstance) {
+        approvePickupMarker = L.marker(approvePickupCoords, { draggable: true }).addTo(approveMapInstance);
+        approvePickupMarker.bindPopup("<b>Pickup Pin (Draggable)</b>").openPopup();
+        approvePickupMarker.on('dragend', () => {
+            const pos = approvePickupMarker.getLatLng();
+            approvePickupCoords = [pos.lat, pos.lng];
+            updateApproveCoordsBadges();
+        });
+
+        approveDropMarker = L.marker(approveDropCoords, { draggable: true }).addTo(approveMapInstance);
+        approveDropMarker.bindPopup("<b>Drop Pin (Draggable)</b>");
+        approveDropMarker.on('dragend', () => {
+            const pos = approveDropMarker.getLatLng();
+            approveDropCoords = [pos.lat, pos.lng];
+            updateApproveCoordsBadges();
+        });
+
+        updateApproveCoordsBadges();
+
+        try {
+            const group = new L.featureGroup([approvePickupMarker, approveDropMarker]);
+            approveMapInstance.fitBounds(group.getBounds().pad(0.15));
+        } catch (e) {
+            console.error("Failed to fit bounds:", e);
+        }
     }
 }
 
