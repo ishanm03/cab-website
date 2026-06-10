@@ -19,6 +19,11 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+// Global error catcher for diagnostics
+window.addEventListener("error", (e) => {
+    alert("Diagnostic Alert - JS Error: " + e.message + "\nFile: " + e.filename + "\nLine: " + e.lineno);
+});
+
 // DOM Selector Handles
 const adminWelcome = document.getElementById("admin-welcome");
 const btnAdminLogout = document.getElementById("btn-admin-logout");
@@ -1184,11 +1189,18 @@ async function handlePromoFormSubmit(e) {
 function startFleetSnapshotListeners() {
     if (!db) return;
 
-    const vehiclesQuery = query(collection(db, "vehicles"), orderBy("creation_ts", "desc"));
+    const vehiclesQuery = collection(db, "vehicles");
     firestoreFleetUnsubscribe = onSnapshot(vehiclesQuery, (snapshot) => {
         vehiclesData = [];
         snapshot.forEach(doc => {
             vehiclesData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sort in memory by creation_ts descending, fallback to doc ID
+        vehiclesData.sort((a, b) => {
+            const tA = a.creation_ts?.seconds || 0;
+            const tB = b.creation_ts?.seconds || 0;
+            return tB - tA;
         });
         
         renderFleetInventory();
@@ -1197,13 +1209,21 @@ function startFleetSnapshotListeners() {
         loadFleetRoster();
     }, (error) => {
         console.error("Vehicles stream error:", error);
+        utils.showAlert(adminAlert, "Vehicles database stream error: " + error.message);
     });
 
-    const driversQuery = query(collection(db, "drivers"), orderBy("creation_ts", "desc"));
+    const driversQuery = collection(db, "drivers");
     firestoreDriversUnsubscribe = onSnapshot(driversQuery, (snapshot) => {
         driversData = [];
         snapshot.forEach(doc => {
             driversData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sort in memory by creation_ts descending, fallback to doc ID
+        driversData.sort((a, b) => {
+            const tA = a.creation_ts?.seconds || 0;
+            const tB = b.creation_ts?.seconds || 0;
+            return tB - tA;
         });
         
         renderDriverRegistry();
@@ -1212,6 +1232,7 @@ function startFleetSnapshotListeners() {
         loadFleetRoster();
     }, (error) => {
         console.error("Drivers stream error:", error);
+        utils.showAlert(adminAlert, "Drivers database stream error: " + error.message);
     });
 }
 
@@ -1304,7 +1325,7 @@ function renderDriverRegistry() {
             <td class="py-4 px-5 text-slate-300 uppercase">${driver.license_number}</td>
             <td class="py-4 px-5 text-slate-400">${vehicleStr}</td>
             <td class="py-4 px-5">
-                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass} uppercase">${driver.status.replace('_', ' ')}</span>
+                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${statusBadgeClass} uppercase">${(driver.status || "active").replace('_', ' ')}</span>
             </td>
             <td class="py-4 px-5 text-right space-x-2">
                 <button type="button" class="btn-edit-driver text-amber-500 hover:underline font-semibold text-xs" data-id="${driver.id}">Edit</button>
