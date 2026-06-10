@@ -117,10 +117,9 @@ function initAuthObserver() {
             if (confirmLogout) {
                 try {
                     await authService.logout();
-                    alert("Successfully logged out!");
+                    console.log("Successfully logged out!");
                 } catch (error) {
                     console.error("IshanCabs: Error during header logout:", error);
-                    alert("Sign out failed: " + error.message);
                 }
             }
         }
@@ -131,8 +130,7 @@ function initAuthObserver() {
         heroBookBtn.addEventListener("click", (e) => {
             if (!isUserLoggedIn) {
                 e.preventDefault(); // Stop navigating to booking.html
-                alert("Please sign up or log in first to book a cab.");
-                window.location.href = "./modules/auth/auth.html";
+                window.location.href = "./modules/auth/auth.html?msg=login_required";
             }
         });
     }

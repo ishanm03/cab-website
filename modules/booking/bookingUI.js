@@ -438,11 +438,11 @@ async function handleMapSearch() {
     const isDropCustom = dropSelect.value === "Custom Location";
 
     if (target === "pickup" && !isPickupCustom) {
-        alert("Pickup location is not set to 'Custom Location'. Change selection in the dropdown first.");
+        utils.showAlert(bookingAlert, "Pickup location is not set to 'Custom Location'. Change selection in the dropdown first.");
         return;
     }
     if (target === "drop" && !isDropCustom) {
-        alert("Drop location is not set to 'Custom Location'. Change selection in the dropdown first.");
+        utils.showAlert(bookingAlert, "Drop location is not set to 'Custom Location'. Change selection in the dropdown first.");
         return;
     }
 
@@ -488,11 +488,11 @@ async function handleMapSearch() {
                 mapInstance.setView([lat, lng], 14);
             }
         } else {
-            alert("No results found for that address.");
+            utils.showAlert(bookingAlert, "No results found for that address.");
         }
     } catch (err) {
         console.error("Geocoding error:", err);
-        alert("Search failed: " + err.message);
+        utils.showAlert(bookingAlert, "Search failed: " + err.message);
     }
 }
 

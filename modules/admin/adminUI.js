@@ -21,7 +21,7 @@ import {
 
 // Global error catcher for diagnostics
 window.addEventListener("error", (e) => {
-    alert("Diagnostic Alert - JS Error: " + e.message + "\nFile: " + e.filename + "\nLine: " + e.lineno);
+    console.error("Diagnostic Alert - JS Error: ", e.message, "File: ", e.filename, "Line: ", e.lineno);
 });
 
 // DOM Selector Handles
@@ -331,7 +331,7 @@ function handleRosterSelectionChange() {
             approveVehicleNumber.value = driver.vehicle_number || "";
 
             if (driver.is_busy) {
-                alert(`Warning: This driver/car is currently assigned to a confirmed or active ride. Confirming this assignment will conflict unless you select another.`);
+                utils.showAlert(adminAlert, `Warning: This driver/car is currently assigned to a confirmed or active ride. Confirming this assignment will conflict unless you select another.`);
             }
         } catch (err) {
             console.error("Failed to parse stringified roster data", err);
@@ -704,7 +704,7 @@ function bindCardActionButtonEvents() {
                 const url = `https://wa.me/${cleanNumber}`;
                 window.open(url, "_blank");
             } else {
-                alert("Rider phone details are unavailable.");
+                utils.showAlert(adminAlert, "Rider phone details are unavailable.");
             }
         });
     });
@@ -719,7 +719,7 @@ async function handleApprovalFormSubmit(e) {
     const vehicleNumber = approveVehicleNumber.value.trim().toUpperCase();
 
     if (!driverName || !driverPhone || !vehicleNumber) {
-        alert("Please complete all allocation fields.");
+        utils.showAlert(adminAlert, "Please complete all allocation fields.");
         return;
     }
 
@@ -732,7 +732,8 @@ async function handleApprovalFormSubmit(e) {
     );
 
     if (conflictBooking) {
-        alert(`Assignment Conflict: Driver or Car is already assigned to active Booking ID: ${conflictBooking.booking_id} (Status: ${conflictBooking.status === "active" ? "On-Going" : "Confirmed"}). Please select another driver/car.`);
+        utils.hideElement(approvalModal);
+        utils.showAlert(adminAlert, `Assignment Conflict: Driver or Car is already assigned to active Booking ID: ${conflictBooking.booking_id} (Status: ${conflictBooking.status === "active" ? "On-Going" : "Confirmed"}). Please select another driver/car.`);
         return;
     }
 
@@ -784,7 +785,7 @@ async function handleRejectionFormSubmit(e) {
     const reason = rejectReason.value.trim();
 
     if (!reason) {
-        alert("Please specify a reason.");
+        utils.showAlert(adminAlert, "Please specify a reason.");
         return;
     }
 
@@ -821,7 +822,7 @@ async function handleLogout() {
             window.location.href = "../auth/auth.html";
         } catch (error) {
             console.error("IshanCabs: Admin Logout Error:", error);
-            alert("Sign out failed: " + error.message);
+            utils.showAlert(adminAlert, "Sign out failed: " + error.message);
         }
     }
 }
@@ -1157,7 +1158,7 @@ async function handlePromoFormSubmit(e) {
     const visibleToCustomer = promoVisibleInput.checked;
 
     if (!code) {
-        alert("Please specify a promo code name.");
+        utils.showAlert(adminAlert, "Please specify a promo code name.");
         return;
     }
 
@@ -1413,8 +1414,7 @@ async function handleVehicleFormSubmit(e) {
         if (!editId && standardizedId !== editId) {
             const docSnap = await getDoc(vehicleDocRef);
             if (docSnap.exists()) {
-                alert(`Vehicle with Plate Number ${plateVal} already exists!`);
-                utils.hideElement(adminAlert);
+                utils.showAlert(adminAlert, `Vehicle with Plate Number ${plateVal} already exists!`);
                 return;
             }
         }
@@ -1502,8 +1502,7 @@ async function handleDriverFormSubmit(e) {
         if (!editId && standardizedId !== editId) {
             const docSnap = await getDoc(driverDocRef);
             if (docSnap.exists()) {
-                alert(`Driver with phone number ${phoneVal} is already registered!`);
-                utils.hideElement(adminAlert);
+                utils.showAlert(adminAlert, `Driver with phone number ${phoneVal} is already registered!`);
                 return;
             }
         }

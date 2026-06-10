@@ -31,6 +31,9 @@ Major structural redesign for backend security and database isolation.
 *   `[ ]` **Task 4.1: Transition to Client-Server Architecture**
     *   **Description**: Move core business logic (fare calculation, overbooking validation, promo threshold checking) from the customer browser JS to a secure backend API (e.g. FastAPI in Python).
     *   **Implications**: Lock Firestore security rules to prevent direct writes from browsers, route updates through server-side verification using the Firebase Admin SDK, and hide third-party API credentials on the server.
+*   `[x]` **Task 4.2: Remove Diagnostic Browser Alert Pop-ups**
+    *   **Description**: Remove `window.addEventListener("error")` from `adminUI.js` and other diagnostic alert modals.
+    *   **Implications**: Replaces user-facing browser `alert()` pop-ups with clean console logs or UI notifications to ensure standard consumer-grade UX.
 
 ### ✉️ Epic 5: Multichannel Notification System (MVP)
 Communication workflows for rider updates, admin alerts, and auth tokens.

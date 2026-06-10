@@ -363,7 +363,7 @@ function bindActivityListInteractiveEvents() {
             const commentsText = form.querySelector(".comments-input").value.trim();
 
             if (!commentsText) {
-                alert("Please add a review comment.");
+                console.warn("Please add a review comment.");
                 return;
             }
 

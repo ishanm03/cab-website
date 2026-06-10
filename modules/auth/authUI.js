@@ -49,6 +49,12 @@ let activeRiderTab = "google"; // "google" | "phone"
 // Initialize Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
     initUI();
+    
+    // Check URL parameters for redirection messages
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("msg") === "login_required") {
+        utils.showAlert(authAlert, "Please sign up or log in first to book a cab.");
+    }
 });
 
 function initUI() {
