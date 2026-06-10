@@ -117,6 +117,42 @@ let approveDropMarker = null;
 let approvePickupCoords = null; // [lat, lng]
 let approveDropCoords = null;   // [lat, lng]
 
+// New Booking Panel Elements
+const viewNewBookingTab = document.getElementById("view-new-booking-tab");
+const panelNewBooking = document.getElementById("panel-new-booking");
+const adminBookingCustomerName = document.getElementById("admin-booking-customer-name");
+const adminBookingCustomerPhone = document.getElementById("admin-booking-customer-phone");
+const adminBookingChannel = document.getElementById("admin-booking-channel");
+const adminBookingForm = document.getElementById("admin-booking-form");
+const adminBookingCategory = document.getElementById("admin-booking-category");
+const adminBookingDate = document.getElementById("admin-booking-date");
+const adminBookingTime = document.getElementById("admin-booking-time");
+const adminBookingPickup = document.getElementById("admin-booking-pickup");
+const adminBookingDrop = document.getElementById("admin-booking-drop");
+const adminCustomPickupContainer = document.getElementById("admin-custom-pickup-container");
+const adminCustomDropContainer = document.getElementById("admin-custom-drop-container");
+const adminBookingCustomPickup = document.getElementById("admin-booking-custom-pickup");
+const adminBookingCustomDrop = document.getElementById("admin-booking-custom-drop");
+const adminDaysContainer = document.getElementById("admin-days-container");
+const adminBookingDays = document.getElementById("admin-booking-days");
+const adminHoursContainer = document.getElementById("admin-hours-container");
+const adminBookingHours = document.getElementById("admin-booking-hours");
+const adminBookingTier = document.getElementById("admin-booking-tier");
+const adminBookingRoster = document.getElementById("admin-booking-roster");
+const adminBookingDiscount = document.getElementById("admin-booking-discount");
+const adminBookingMapSearch = document.getElementById("admin-booking-map-search");
+const btnAdminBookingMapSearch = document.getElementById("btn-admin-booking-map-search");
+const adminBookingPickupCoordsBadge = document.getElementById("admin-booking-pickup-coords-badge");
+const adminBookingDropCoordsBadge = document.getElementById("admin-booking-drop-coords-badge");
+const adminBookingSaveCoords = document.getElementById("admin-booking-save-coords");
+
+let adminBookingMapInstance = null;
+let adminBookingPickupMarker = null;
+let adminBookingDropMarker = null;
+let adminBookingPickupCoords = null;
+let adminBookingDropCoords = null;
+
+
 
 // Fleet inventory elements
 const vehicleModal = document.getElementById("vehicle-modal");
@@ -513,6 +549,17 @@ function renderBookings() {
             badgeClass = "bg-rose-500/10 border-rose-500/20 text-rose-400";
         }
 
+        // Style booking channel badges cleanly
+        let channelText = "Website";
+        let channelClass = "bg-sky-500/10 border-sky-500/20 text-sky-400";
+        if (booking.booking_channel === "call") {
+            channelText = "📞 Call";
+            channelClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
+        } else if (booking.booking_channel === "whatsapp") {
+            channelText = "💬 WhatsApp";
+            channelClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+        }
+
         const dateStr = booking.trip_details.pickup_date || "--";
         const timeStr = booking.trip_details.pickup_time || "--";
         const creationDate = booking.creation_ts ? new Date(booking.creation_ts.seconds * 1000).toLocaleString() : "Recently Added";
@@ -538,7 +585,12 @@ function renderBookings() {
                 <div class="flex justify-between items-start border-b border-slate-800 pb-3">
                     <div>
                         <span class="text-[10px] font-black text-slate-500 tracking-wider block uppercase">Booking ID</span>
-                        <h4 class="font-bold text-white text-sm tracking-wide mt-0.5">${booking.booking_id}</h4>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <h4 class="font-bold text-white text-sm tracking-wide">${booking.booking_id}</h4>
+                            <span class="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider border ${channelClass}">
+                                ${channelText}
+                            </span>
+                        </div>
                     </div>
                     <span class="border px-2.5 py-1 rounded-xl text-xs font-bold ${badgeClass}">
                         ${statusText}
@@ -1130,7 +1182,8 @@ function setupViewSwitchers() {
         { btn: viewFleetTab, panel: panelFleet },
         { btn: viewDriversTab, panel: panelDrivers },
         { btn: viewSettingsTab, panel: panelSettings },
-        { btn: viewLocationsTab, panel: panelLocations }
+        { btn: viewLocationsTab, panel: panelLocations },
+        { btn: viewNewBookingTab, panel: panelNewBooking }
     ];
 
     tabs.forEach(tab => {
@@ -1156,6 +1209,10 @@ function setupViewSwitchers() {
                 initLocationFormMap();
                 loadLocationsList();
                 loadFlatFaresList();
+            } else if (tab.btn === viewNewBookingTab) {
+                initAdminBookingForm();
+                initAdminBookingMap();
+                loadAdminBookingRoster();
             }
         });
     });
@@ -2665,4 +2722,791 @@ async function geocodeAndPositionMarkers(pickupText, dropText) {
         }
     }
 }
+
+// =========================================================================
+// ADMIN NEW BOOKING PANEL CONTROLLERS & FORM HANDLING
+// =========================================================================
+
+let adminPredefinedLocations = [];
+let isAdminBookingFormInitialized = false;
+let currentAdminEstimatedFare = 0;
+let currentAdminBaseFare = 0;
+let currentAdminDistanceKm = 0;
+let currentAdminPolyline = null;
+let currentAdminFlatMetrics = null;
+
+async function initAdminBookingForm() {
+    // 1. Hydrate pickup date & time defaults
+    const today = new Date().toISOString().split('T')[0];
+    adminBookingDate.value = today;
+    adminBookingDate.min = today;
+    hydrateAdminTimeDropdown();
+    
+    // 2. Fetch predefined locations
+    await loadAdminLocations();
+    
+    // 3. Reset form field visibilities
+    utils.hideElement(adminCustomPickupContainer);
+    adminBookingCustomPickup.required = false;
+    utils.hideElement(adminCustomDropContainer);
+    adminBookingCustomDrop.required = false;
+    utils.hideElement(adminDaysContainer);
+    adminBookingDays.required = false;
+    utils.hideElement(adminHoursContainer);
+    adminBookingHours.required = false;
+    
+    if (isAdminBookingFormInitialized) {
+        updateAdminRouteAndFare();
+        return;
+    }
+    
+    // 4. Bind event listeners (only once)
+    adminBookingPickup.addEventListener("change", () => {
+        const isCustom = adminBookingPickup.value === "custom";
+        if (isCustom) {
+            utils.showElement(adminCustomPickupContainer);
+            adminBookingCustomPickup.required = true;
+        } else {
+            utils.hideElement(adminCustomPickupContainer);
+            adminBookingCustomPickup.required = false;
+            adminBookingCustomPickup.value = "";
+        }
+        updateAdminBookingDropOptions();
+        updateAdminRouteAndFare();
+    });
+    
+    adminBookingDrop.addEventListener("change", () => {
+        const isCustom = adminBookingDrop.value === "custom";
+        const category = adminBookingCategory.value;
+        if (isCustom && category !== "rental") {
+            utils.showElement(adminCustomDropContainer);
+            adminBookingCustomDrop.required = true;
+        } else {
+            utils.hideElement(adminCustomDropContainer);
+            adminBookingCustomDrop.required = false;
+            adminBookingCustomDrop.value = "";
+        }
+        updateAdminRouteAndFare();
+    });
+    
+    adminBookingCategory.addEventListener("change", () => {
+        const cat = adminBookingCategory.value;
+        if (cat === "outstation") {
+            utils.showElement(adminDaysContainer);
+            adminBookingDays.required = true;
+            utils.hideElement(adminHoursContainer);
+            adminBookingHours.required = false;
+        } else if (cat === "rental") {
+            utils.hideElement(adminDaysContainer);
+            adminBookingDays.required = false;
+            utils.showElement(adminHoursContainer);
+            adminBookingHours.required = true;
+        } else {
+            utils.hideElement(adminDaysContainer);
+            adminBookingDays.required = false;
+            utils.hideElement(adminHoursContainer);
+            adminBookingHours.required = false;
+        }
+        
+        // Adjust drop location requirements for hourly rentals
+        const isDropCustom = adminBookingDrop.value === "custom";
+        if (cat === "rental") {
+            utils.hideElement(adminCustomDropContainer);
+            adminBookingCustomDrop.required = false;
+            adminBookingDrop.required = false;
+        } else {
+            if (isDropCustom) {
+                utils.showElement(adminCustomDropContainer);
+                adminBookingCustomDrop.required = true;
+            }
+            adminBookingDrop.required = true;
+        }
+        
+        updateAdminRouteAndFare();
+    });
+    
+    adminBookingDate.addEventListener("change", updateAdminRouteAndFare);
+    adminBookingTime.addEventListener("change", updateAdminRouteAndFare);
+    adminBookingDays.addEventListener("input", updateAdminRouteAndFare);
+    adminBookingHours.addEventListener("change", updateAdminRouteAndFare);
+    adminBookingTier.addEventListener("change", updateAdminRouteAndFare);
+    adminBookingDiscount.addEventListener("input", updateAdminRouteAndFare);
+    
+    adminBookingForm.addEventListener("submit", handleAdminBookingFormSubmit);
+    
+    isAdminBookingFormInitialized = true;
+    updateAdminRouteAndFare();
+}
+
+function hydrateAdminTimeDropdown() {
+    adminBookingTime.innerHTML = "";
+    const periods = ["AM", "PM"];
+    for (let p = 0; p < periods.length; p++) {
+        const period = periods[p];
+        for (let h = 1; h <= 12; h++) {
+            const hourStr = h.toString();
+            const mins = ["00", "30"];
+            for (let m = 0; m < mins.length; m++) {
+                const minStr = mins[m];
+                const timeText = `${hourStr}:${minStr} ${period}`;
+                const opt = document.createElement("option");
+                opt.value = timeText;
+                opt.textContent = timeText;
+                if (timeText === "10:00 AM") opt.selected = true;
+                adminBookingTime.appendChild(opt);
+            }
+        }
+    }
+}
+
+async function loadAdminLocations() {
+    if (!db) return;
+    try {
+        const snap = await getDocs(query(collection(db, "locations"), orderBy("name")));
+        adminPredefinedLocations = snap.docs.map(doc => doc.data());
+        
+        const pickupVal = adminBookingPickup.value;
+        adminBookingPickup.innerHTML = `
+            <option value="" disabled selected>Select Pickup Location</option>
+            <option value="custom">Custom Location</option>
+        `;
+        adminPredefinedLocations.filter(loc => loc.type === "pickup" || loc.type === "both").forEach(loc => {
+            const opt = document.createElement("option");
+            opt.value = loc.name;
+            opt.textContent = loc.name;
+            adminBookingPickup.appendChild(opt);
+        });
+        
+        if (pickupVal) {
+            adminBookingPickup.value = pickupVal;
+        }
+    } catch (err) {
+        console.error("Failed to load locations for admin booking:", err);
+    }
+}
+
+function updateAdminBookingDropOptions() {
+    const pickupVal = adminBookingPickup.value;
+    if (!pickupVal) return;
+    
+    const currentDropVal = adminBookingDrop.value;
+    
+    adminBookingDrop.innerHTML = `
+        <option value="" disabled selected>Select Drop Location</option>
+        <option value="custom">Custom Location</option>
+    `;
+    
+    let drops = [];
+    if (pickupVal === "custom") {
+        drops = adminPredefinedLocations.filter(loc => loc.type === "drop" || loc.type === "both");
+    } else {
+        drops = adminPredefinedLocations.filter(loc => (loc.type === "drop" || loc.type === "both") && loc.name !== pickupVal);
+    }
+    
+    drops.forEach(loc => {
+        const opt = document.createElement("option");
+        opt.value = loc.name;
+        opt.textContent = loc.name;
+        adminBookingDrop.appendChild(opt);
+    });
+    
+    if (currentDropVal) {
+        const exists = drops.some(l => l.name === currentDropVal) || currentDropVal === "custom";
+        if (exists) {
+            adminBookingDrop.value = currentDropVal;
+        }
+    }
+}
+
+function initAdminBookingMap() {
+    const kolkataCenter = [22.5726, 88.3639];
+    
+    if (adminBookingPickupMarker) {
+        if (adminBookingMapInstance) adminBookingMapInstance.removeLayer(adminBookingPickupMarker);
+        adminBookingPickupMarker = null;
+    }
+    if (adminBookingDropMarker) {
+        if (adminBookingMapInstance) adminBookingMapInstance.removeLayer(adminBookingDropMarker);
+        adminBookingDropMarker = null;
+    }
+    adminBookingPickupCoords = null;
+    adminBookingDropCoords = null;
+    updateAdminCoordsBadges();
+    
+    if (!adminBookingMapInstance) {
+        adminBookingMapInstance = L.map('admin-booking-map').setView(kolkataCenter, 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(adminBookingMapInstance);
+        
+        adminBookingMapInstance.on('click', (e) => {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const target = document.querySelector('input[name="admin-booking-search-target"]:checked')?.value || "pickup";
+            if (target === "pickup") {
+                adminBookingPickupCoords = [lat, lng];
+                if (adminBookingPickupMarker) {
+                    adminBookingPickupMarker.setLatLng(e.latlng);
+                } else {
+                    adminBookingPickupMarker = L.marker(adminBookingPickupCoords, { draggable: true }).addTo(adminBookingMapInstance);
+                    adminBookingPickupMarker.on('dragend', () => {
+                        const pos = adminBookingPickupMarker.getLatLng();
+                        adminBookingPickupCoords = [pos.lat, pos.lng];
+                        updateAdminCoordsBadges();
+                        updateAdminRouteAndFare();
+                    });
+                }
+            } else {
+                adminBookingDropCoords = [lat, lng];
+                if (adminBookingDropMarker) {
+                    adminBookingDropMarker.setLatLng(e.latlng);
+                } else {
+                    adminBookingDropMarker = L.marker(adminBookingDropCoords, { draggable: true }).addTo(adminBookingMapInstance);
+                    adminBookingDropMarker.on('dragend', () => {
+                        const pos = adminBookingDropMarker.getLatLng();
+                        adminBookingDropCoords = [pos.lat, pos.lng];
+                        updateAdminCoordsBadges();
+                        updateAdminRouteAndFare();
+                    });
+                }
+            }
+            updateAdminCoordsBadges();
+            updateAdminRouteAndFare();
+        });
+        
+        btnAdminBookingMapSearch.addEventListener("click", handleAdminBookingMapSearch);
+        adminBookingMapSearch.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdminBookingMapSearch();
+            }
+        });
+    } else {
+        adminBookingMapInstance.setView(kolkataCenter, 12);
+    }
+    
+    setTimeout(() => {
+        if (adminBookingMapInstance) adminBookingMapInstance.invalidateSize();
+    }, 200);
+}
+
+function updateAdminCoordsBadges() {
+    if (adminBookingPickupCoords) {
+        adminBookingPickupCoordsBadge.textContent = `${adminBookingPickupCoords[0].toFixed(4)}, ${adminBookingPickupCoords[1].toFixed(4)}`;
+    } else {
+        adminBookingPickupCoordsBadge.textContent = "--, --";
+    }
+    
+    if (adminBookingDropCoords) {
+        adminBookingDropCoordsBadge.textContent = `${adminBookingDropCoords[0].toFixed(4)}, ${adminBookingDropCoords[1].toFixed(4)}`;
+    } else {
+        adminBookingDropCoordsBadge.textContent = "--, --";
+    }
+}
+
+async function handleAdminBookingMapSearch() {
+    const queryStr = adminBookingMapSearch.value.trim();
+    if (!queryStr) return;
+    
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryStr)}&limit=1`, {
+            headers: { 'Accept-Language': 'en' }
+        });
+        if (!response.ok) throw new Error("Search request failed");
+        const results = await response.json();
+        if (results && results.length > 0) {
+            const lat = parseFloat(results[0].lat);
+            const lng = parseFloat(results[0].lon);
+            
+            adminBookingMapInstance.setView([lat, lng], 14);
+            const target = document.querySelector('input[name="admin-booking-search-target"]:checked')?.value || "pickup";
+            if (target === "pickup") {
+                adminBookingPickupCoords = [lat, lng];
+                if (adminBookingPickupMarker) {
+                    adminBookingPickupMarker.setLatLng([lat, lng]);
+                } else {
+                    adminBookingPickupMarker = L.marker([lat, lng], { draggable: true }).addTo(adminBookingMapInstance);
+                    adminBookingPickupMarker.on('dragend', () => {
+                        const pos = adminBookingPickupMarker.getLatLng();
+                        adminBookingPickupCoords = [pos.lat, pos.lng];
+                        updateAdminCoordsBadges();
+                        updateAdminRouteAndFare();
+                    });
+                }
+            } else {
+                adminBookingDropCoords = [lat, lng];
+                if (adminBookingDropMarker) {
+                    adminBookingDropMarker.setLatLng([lat, lng]);
+                } else {
+                    adminBookingDropMarker = L.marker([lat, lng], { draggable: true }).addTo(adminBookingMapInstance);
+                    adminBookingDropMarker.on('dragend', () => {
+                        const pos = adminBookingDropMarker.getLatLng();
+                        adminBookingDropCoords = [pos.lat, pos.lng];
+                        updateAdminCoordsBadges();
+                        updateAdminRouteAndFare();
+                    });
+                }
+            }
+            updateAdminCoordsBadges();
+            updateAdminRouteAndFare();
+        } else {
+            alert("No locations found for your search query.");
+        }
+    } catch (err) {
+        console.error("Geocoding search failed:", err);
+        alert("Search failed: " + err.message);
+    }
+}
+
+function loadAdminBookingRoster() {
+    if (!adminBookingRoster) return;
+
+    const activeRoster = {
+        compact: [],
+        premium: [],
+        suv: [],
+        muv: []
+    };
+
+    driversData.forEach(driver => {
+        if (driver.status === "active" && driver.assigned_vehicle_id) {
+            const vehicle = vehiclesData.find(v => v.id === driver.assigned_vehicle_id);
+            if (vehicle && vehicle.status === "active" && activeRoster[vehicle.tier]) {
+                activeRoster[vehicle.tier].push({
+                    driver_id: driver.id,
+                    driver_name: driver.name,
+                    driver_phone: driver.phone,
+                    vehicle_id: vehicle.id,
+                    vehicle_number: vehicle.plate_number,
+                    vehicle_tier: vehicle.tier,
+                    vehicle_model: vehicle.model
+                });
+            }
+        }
+    });
+
+    adminBookingRoster.innerHTML = '<option value="" selected>-- Keep Pending Approval --</option>';
+
+    Object.keys(activeRoster).forEach(tier => {
+        const group = document.createElement("optgroup");
+        group.label = tier.toUpperCase() + " Class";
+        
+        activeRoster[tier].forEach(item => {
+            const isBusy = bookingsData.some(b => 
+                (b.status === "confirmed" || b.status === "active") && 
+                b.driver_assignment && 
+                (b.driver_assignment.vehicle_number === item.vehicle_number || b.driver_assignment.driver_phone === item.driver_phone)
+            );
+
+            const label = isBusy 
+                ? `${item.driver_name} (${item.vehicle_number}) - [Busy - On Ride]` 
+                : `${item.driver_name} (${item.vehicle_number})`;
+
+            const option = document.createElement("option");
+            option.textContent = label;
+            
+            option.value = JSON.stringify({
+                driver_id: item.driver_id,
+                driver_name: item.driver_name,
+                driver_phone: item.driver_phone,
+                vehicle_id: item.vehicle_id,
+                vehicle_number: item.vehicle_number,
+                vehicle_model: item.vehicle_model,
+                vehicle_tier: item.vehicle_tier,
+                is_busy: isBusy
+            });
+
+            if (isBusy) {
+                option.className = "text-slate-500 italic";
+            } else {
+                option.className = "text-white font-semibold";
+            }
+            group.appendChild(option);
+        });
+        adminBookingRoster.appendChild(group);
+    });
+}
+
+async function updateAdminRouteAndFare() {
+    const category = adminBookingCategory.value;
+    const pickup = adminBookingPickup.value;
+    const drop = adminBookingDrop.value;
+    const days = parseInt(adminBookingDays.value) || 1;
+    const hours = category === "rental" ? parseInt(adminBookingHours.value) : 0;
+    const tier = adminBookingTier.value;
+    const discountVal = parseFloat(adminBookingDiscount.value) || 0;
+    
+    const isPickupCustom = pickup === "custom";
+    const isDropCustom = drop === "custom";
+    
+    let pickupCoords = null;
+    let dropCoords = null;
+    
+    if (!isPickupCustom && pickup) {
+        const found = adminPredefinedLocations.find(l => l.name === pickup);
+        if (found) {
+            pickupCoords = [found.lat, found.lng];
+        }
+    } else if (isPickupCustom) {
+        pickupCoords = adminBookingPickupCoords;
+    }
+    
+    if (category !== "rental") {
+        if (!isDropCustom && drop) {
+            const found = adminPredefinedLocations.find(l => l.name === drop);
+            if (found) {
+                dropCoords = [found.lat, found.lng];
+            }
+        } else if (isDropCustom) {
+            dropCoords = adminBookingDropCoords;
+        }
+    }
+    
+    if (adminBookingMapInstance) {
+        if (pickupCoords) {
+            if (adminBookingPickupMarker) {
+                adminBookingPickupMarker.setLatLng(pickupCoords);
+            } else {
+                adminBookingPickupMarker = L.marker(pickupCoords, { draggable: true }).addTo(adminBookingMapInstance);
+                adminBookingPickupMarker.on('dragend', () => {
+                    const pos = adminBookingPickupMarker.getLatLng();
+                    adminBookingPickupCoords = [pos.lat, pos.lng];
+                    updateAdminCoordsBadges();
+                    updateAdminRouteAndFare();
+                });
+            }
+        } else {
+            if (adminBookingPickupMarker) {
+                adminBookingMapInstance.removeLayer(adminBookingPickupMarker);
+                adminBookingPickupMarker = null;
+            }
+        }
+        
+        if (dropCoords) {
+            if (adminBookingDropMarker) {
+                adminBookingDropMarker.setLatLng(dropCoords);
+            } else {
+                adminBookingDropMarker = L.marker(dropCoords, { draggable: true }).addTo(adminBookingMapInstance);
+                adminBookingDropMarker.on('dragend', () => {
+                    const pos = adminBookingDropMarker.getLatLng();
+                    adminBookingDropCoords = [pos.lat, pos.lng];
+                    updateAdminCoordsBadges();
+                    updateAdminRouteAndFare();
+                });
+            }
+        } else {
+            if (adminBookingDropMarker) {
+                adminBookingMapInstance.removeLayer(adminBookingDropMarker);
+                adminBookingDropMarker = null;
+            }
+        }
+        
+        updateAdminCoordsBadges();
+    }
+    
+    let distanceKm = 0;
+    let polyline = null;
+    let metrics = null;
+    
+    if (category === "rental") {
+        distanceKm = 0;
+        polyline = null;
+    } else {
+        if (!isPickupCustom && !isDropCustom && pickup && drop) {
+            try {
+                const flatFareQuery = query(
+                    collection(db, "flat_fares"),
+                    where("pickup_name", "==", pickup),
+                    where("drop_name", "==", drop)
+                );
+                const flatFareSnap = await getDocs(flatFareQuery);
+                if (!flatFareSnap.empty) {
+                    const flatFareData = flatFareSnap.docs[0].data();
+                    metrics = {
+                        km: flatFareData.km || 0,
+                        base_fare_compact: flatFareData.fares.compact,
+                        base_fare_premium: flatFareData.fares.premium,
+                        base_fare_suv: flatFareData.fares.suv,
+                        base_fare_muv: flatFareData.fares.muv
+                    };
+                    distanceKm = metrics.km;
+                }
+            } catch (err) {
+                console.warn("Failed to check flat fares:", err);
+            }
+        }
+        
+        if (!metrics) {
+            if (pickupCoords && dropCoords) {
+                try {
+                    const pickupLng = pickupCoords[1];
+                    const pickupLat = pickupCoords[0];
+                    const dropLng = dropCoords[1];
+                    const dropLat = dropCoords[0];
+                    
+                    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropLng},${dropLat}?overview=full&geometries=geojson`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error("OSRM route fetch failed");
+                    const data = await response.json();
+                    
+                    if (data.routes && data.routes.length > 0) {
+                        const routeData = data.routes[0];
+                        distanceKm = Math.round(routeData.distance / 1000) || 1;
+                        const coords = routeData.geometry.coordinates;
+                        polyline = coords.map(coord => [coord[1], coord[0]]);
+                    } else {
+                        throw new Error("No route in OSRM response");
+                    }
+                } catch (err) {
+                    console.warn("OSRM failed for admin, using Haversine:", err);
+                    const pickupLat = pickupCoords[0];
+                    const pickupLng = pickupCoords[1];
+                    const dropLat = dropCoords[0];
+                    const dropLng = dropCoords[1];
+                    
+                    const R = 6371;
+                    const dLat = (dropLat - pickupLat) * Math.PI / 180;
+                    const dLng = (dropLng - pickupLng) * Math.PI / 180;
+                    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                              Math.cos(pickupLat * Math.PI / 180) * Math.cos(dropLat * Math.PI / 180) *
+                              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    distanceKm = Math.ceil(R * c * 1.3);
+                    polyline = [pickupCoords, dropCoords];
+                }
+            } else {
+                distanceKm = 0;
+                polyline = null;
+            }
+        }
+    }
+    
+    let computedBaseFare = 0;
+    try {
+        const ratesResponse = await bookingService.fetchRates();
+        const activeRates = ratesResponse.rates;
+        
+        computedBaseFare = bookingService.calculateFare(
+            category,
+            distanceKm,
+            days,
+            tier,
+            metrics,
+            hours,
+            activeRates
+        );
+    } catch (e) {
+        console.error("Error computing booking fare:", e);
+        computedBaseFare = bookingService.calculateFare(
+            category,
+            distanceKm,
+            days,
+            tier,
+            metrics,
+            hours,
+            null
+        );
+    }
+    
+    currentAdminBaseFare = computedBaseFare;
+    currentAdminDistanceKm = distanceKm;
+    currentAdminPolyline = polyline;
+    currentAdminFlatMetrics = metrics;
+    currentAdminEstimatedFare = Math.max(0, computedBaseFare - discountVal);
+    
+    const submitBtn = adminBookingForm.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        let text = `Log Booking Request (Est: ₹${currentAdminEstimatedFare})`;
+        if (category !== "rental" && (isPickupCustom || isDropCustom) && (!pickupCoords || !dropCoords)) {
+            text = `Log Booking Request (Pending Map Pin - Est: Base fare ₹${currentAdminEstimatedFare})`;
+        }
+        submitBtn.textContent = text;
+    }
+}
+
+async function handleAdminBookingFormSubmit(e) {
+    e.preventDefault();
+    
+    const customerName = adminBookingCustomerName.value.trim();
+    const customerPhone = adminBookingCustomerPhone.value.trim();
+    const channel = adminBookingChannel.value;
+    const category = adminBookingCategory.value;
+    const dateVal = adminBookingDate.value;
+    const timeVal = adminBookingTime.value;
+    const pickupVal = adminBookingPickup.value;
+    const dropVal = adminBookingDrop.value;
+    const customPickupVal = adminBookingCustomPickup.value.trim();
+    const customDropVal = adminBookingCustomDrop.value.trim();
+    const days = category === "outstation" ? (parseInt(adminBookingDays.value) || 1) : null;
+    const hours = category === "rental" ? (parseInt(adminBookingHours.value) || 5) : null;
+    const tier = adminBookingTier.value;
+    const discountOverride = parseFloat(adminBookingDiscount.value) || 0;
+    const rosterSelection = adminBookingRoster.value;
+    
+    if (!customerName || !customerPhone) {
+        utils.showAlert(adminAlert, "Please enter customer name and phone number.");
+        return;
+    }
+    
+    if (!pickupVal) {
+        utils.showAlert(adminAlert, "Please select a pickup location.");
+        return;
+    }
+    
+    if (category !== "rental" && !dropVal) {
+        utils.showAlert(adminAlert, "Please select a drop location.");
+        return;
+    }
+    
+    const isPickupCustom = pickupVal === "custom";
+    const isDropCustom = dropVal === "custom";
+    
+    if (isPickupCustom && !customPickupVal) {
+        utils.showAlert(adminAlert, "Please enter a custom pickup address.");
+        return;
+    }
+    
+    if (category !== "rental" && isDropCustom && !customDropVal) {
+        utils.showAlert(adminAlert, "Please enter a custom drop address.");
+        return;
+    }
+    
+    let pickupCoords = null;
+    let dropCoords = null;
+    
+    if (!isPickupCustom) {
+        const found = adminPredefinedLocations.find(l => l.name === pickupVal);
+        if (found) pickupCoords = [found.lat, found.lng];
+    } else {
+        pickupCoords = adminBookingPickupCoords;
+    }
+    
+    if (category !== "rental") {
+        if (!isDropCustom) {
+            const found = adminPredefinedLocations.find(l => l.name === dropVal);
+            if (found) dropCoords = [found.lat, found.lng];
+        } else {
+            dropCoords = adminBookingDropCoords;
+        }
+    }
+    
+    if (adminBookingSaveCoords.checked) {
+        if (isPickupCustom && !pickupCoords) {
+            utils.showAlert(adminAlert, "Please pin the custom pickup location on the map or uncheck 'Use Geocoded Map Route'.");
+            return;
+        }
+        if (category !== "rental" && isDropCustom && !dropCoords) {
+            utils.showAlert(adminAlert, "Please pin the custom drop location on the map or uncheck 'Use Geocoded Map Route'.");
+            return;
+        }
+    }
+    
+    let status = "pending_approval";
+    let driverAssignment = null;
+    
+    if (rosterSelection) {
+        try {
+            const rosterData = JSON.parse(rosterSelection);
+            status = "confirmed";
+            driverAssignment = {
+                driver_id: rosterData.driver_id,
+                driver_name: rosterData.driver_name,
+                driver_phone: rosterData.driver_phone,
+                vehicle_id: rosterData.vehicle_id,
+                vehicle_number: rosterData.vehicle_number,
+                vehicle_model: rosterData.vehicle_model,
+                vehicle_tier: rosterData.vehicle_tier
+            };
+        } catch (err) {
+            console.error("Failed to parse driver roster selection:", err);
+        }
+    }
+    
+    const pickupLocName = isPickupCustom ? customPickupVal : pickupVal;
+    const dropLocName = category === "rental" ? "N/A (Hourly Rental)" : (isDropCustom ? customDropVal : dropVal);
+    
+    const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const randomHex = Math.floor(1000 + Math.random() * 9000).toString();
+    const bookingId = `BK-${dateStamp}-${randomHex}`;
+    
+    const bookingPayload = {
+        booking_id: bookingId,
+        customer_id: "admin_created",
+        booking_channel: channel,
+        customer_details: {
+            name: customerName,
+            phone: customerPhone
+        },
+        trip_details: {
+            ride_type: category,
+            pickup_location: pickupLocName,
+            drop_location: dropLocName,
+            pickup_date: dateVal,
+            pickup_time: timeVal,
+            outstation_days: days,
+            rental_hours: hours,
+            pickup_coords: pickupCoords || null,
+            drop_coords: dropCoords || null,
+            route_polyline: currentAdminPolyline ? JSON.stringify(currentAdminPolyline) : null
+        },
+        fare_details: {
+            vehicle_tier: tier,
+            base_fare: currentAdminBaseFare,
+            discount_amount: discountOverride,
+            estimated_fare: currentAdminEstimatedFare,
+            estimated_km: currentAdminDistanceKm
+        },
+        status: status,
+        payment_status: "pending",
+        driver_assignment: driverAssignment,
+        creation_ts: serverTimestamp(),
+        updated_ts: serverTimestamp()
+    };
+    
+    utils.showAlert(adminAlert, "Creating manual booking...", "success");
+    
+    try {
+        if (!db) throw new Error("Firestore not initialized.");
+        await setDoc(doc(db, "bookings", bookingId), bookingPayload);
+        
+        utils.showAlert(adminAlert, `Booking ${bookingId} created successfully!`, "success");
+        
+        adminBookingForm.reset();
+        adminBookingCustomerName.value = "";
+        adminBookingCustomerPhone.value = "";
+        adminBookingPickupCoords = null;
+        adminBookingDropCoords = null;
+        if (adminBookingPickupMarker && adminBookingMapInstance) {
+            adminBookingMapInstance.removeLayer(adminBookingPickupMarker);
+            adminBookingPickupMarker = null;
+        }
+        if (adminBookingDropMarker && adminBookingMapInstance) {
+            adminBookingMapInstance.removeLayer(adminBookingDropMarker);
+            adminBookingDropMarker = null;
+        }
+        updateAdminCoordsBadges();
+        
+        adminBookingPickup.value = "";
+        adminBookingDrop.value = "";
+        
+        utils.hideElement(adminCustomPickupContainer);
+        adminBookingCustomPickup.required = false;
+        utils.hideElement(adminCustomDropContainer);
+        adminBookingCustomDrop.required = false;
+        utils.hideElement(adminDaysContainer);
+        adminBookingDays.required = false;
+        utils.hideElement(adminHoursContainer);
+        adminBookingHours.required = false;
+        
+        updateAdminRouteAndFare();
+        
+        viewBookingsTab.click();
+    } catch (error) {
+        console.error("Failed to create admin booking:", error);
+        utils.showAlert(adminAlert, "Failed to create booking: " + error.message);
+    }
+}
+
 

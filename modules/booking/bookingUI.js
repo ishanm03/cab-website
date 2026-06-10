@@ -966,6 +966,7 @@ async function handleFinalConfirm() {
 
     const bookingPayload = {
         customer_id: currentUser.uid,
+        booking_channel: "website",
         customer_details: {
             name: currentProfile.name || "Rider",
             phone: currentProfile.phone || ""
