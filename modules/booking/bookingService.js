@@ -29,6 +29,45 @@ const RATE_CONFIG = {
     muv:     { rate_per_km: 18.00, driver_allowance_per_day: 500.00, rate_per_hour: 250.00, base_cost: 700.00 }
 };
 
+/**
+ * Helper function to determine if a given time string falls in the night window (11:59 PM - 5:00 AM inclusive)
+ * Handles both 24-hour "HH:MM" format and 12-hour "hh:mm AM/PM" format.
+ * @param {string} timeStr
+ * @returns {boolean}
+ */
+function isNightTime(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return false;
+    
+    const cleanStr = timeStr.trim().toUpperCase();
+    let hours = 0;
+    let minutes = 0;
+    
+    const ampmMatch = cleanStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (ampmMatch) {
+        let h = parseInt(ampmMatch[1], 10);
+        const m = parseInt(ampmMatch[2], 10);
+        const period = ampmMatch[3];
+        if (period === "AM") {
+            if (h === 12) h = 0;
+        } else if (period === "PM") {
+            if (h !== 12) h += 12;
+        }
+        hours = h;
+        minutes = m;
+    } else {
+        const parts = cleanStr.split(":");
+        if (parts.length >= 2) {
+            hours = parseInt(parts[0], 10) || 0;
+            minutes = parseInt(parts[1], 10) || 0;
+        }
+    }
+    
+    const totalMinutes = hours * 60 + minutes;
+    // 11:59 PM = 23 * 60 + 59 = 1439
+    // 5:00 AM = 5 * 60 = 300
+    return totalMinutes >= 1439 || totalMinutes <= 300;
+}
+
 const bookingService = {
     /**
      * Calculates the estimated grand total fare for a given trip configuration
@@ -39,9 +78,10 @@ const bookingService = {
      * @param {object} flatMetrics - Flat metrics from routeMatrix if available
      * @param {number} hours - Rental duration (in hours)
      * @param {object} activeRates - Dynamic rates setting from Firestore
+     * @param {string} pickupTime - Pickup time string (e.g. "10:30 AM" or "10:30")
      * @returns {number} Estimated total fare in INR
      */
-    calculateFare(rideType, distance, days, tier, flatMetrics, hours = 0, activeRates = null) {
+    calculateFare(rideType, distance, days, tier, flatMetrics, hours = 0, activeRates = null, pickupTime = null) {
         // Fallback checks
         const actualDays = Math.max(1, parseInt(days) || 1);
         const actualDistance = parseFloat(distance) || 0;
@@ -56,15 +96,28 @@ const bookingService = {
             return Math.round(hourlyRate * actualHours);
         }
 
-        // 2. If Local / Intercity and flat-rates are mapped in our routesMatrix, use them!
-        if ((rideType === "local" || rideType === "intercity") && flatMetrics) {
+        // 2. If Local and flat-rates override is mapped in the database, use it!
+        if (rideType === "local" && flatMetrics) {
+            let flatFare = 0;
+            if (tier === "compact") flatFare = flatMetrics.base_fare_compact || (flatMetrics.base_fare_premium ? Math.round(flatMetrics.base_fare_premium * 0.85) : 0);
+            else if (tier === "premium") flatFare = flatMetrics.base_fare_premium;
+            else if (tier === "suv") flatFare = flatMetrics.base_fare_suv;
+            else if (tier === "muv") flatFare = flatMetrics.base_fare_muv || (flatMetrics.base_fare_suv ? Math.round(flatMetrics.base_fare_suv * 1.25) : 0);
+            
+            if (flatFare) {
+                return Math.round(flatFare);
+            }
+        }
+
+        // 3. If Intercity and flat-rates are mapped in our routesMatrix/database, use them!
+        if (rideType === "intercity" && flatMetrics) {
             if (tier === "compact") return flatMetrics.base_fare_compact || Math.round((flatMetrics.base_fare_premium || flatMetrics.base_fare_sedan || 999) * 0.85);
             if (tier === "premium") return flatMetrics.base_fare_premium || flatMetrics.base_fare_sedan;
             if (tier === "suv") return flatMetrics.base_fare_suv;
             if (tier === "muv") return flatMetrics.base_fare_muv || Math.round((flatMetrics.base_fare_suv || 1000) * 1.25);
         }
 
-        // 3. Fallback or Outstation computations (Round-Trip pricing based on West Bengal standard guidelines)
+        // 4. Fallback or Outstation computations (Round-Trip pricing based on West Bengal standard guidelines)
         if (rideType === "outstation") {
             // Outstation standard: Round-trip distance (pickup to drop to pickup)
             const roundTripDistance = actualDistance * 2;
@@ -78,8 +131,20 @@ const bookingService = {
             const allowanceCost = actualDays * config.driver_allowance_per_day;
             
             return Math.round(distanceCost + allowanceCost);
+        } else if (rideType === "local") {
+            // Local Point-to-Point distance-based fare calculation
+            const baseFare = config.base_cost || (tier === "compact" ? 250 : (tier === "premium" ? 300 : (tier === "suv" ? 500 : 700)));
+            const ratePerKm = config.rate_per_km || (tier === "compact" ? 10 : (tier === "premium" ? 12 : (tier === "suv" ? 15 : 18)));
+            const extraDistance = Math.max(0, actualDistance - 10);
+            let totalFare = baseFare + (extraDistance * ratePerKm);
+            
+            if (pickupTime && isNightTime(pickupTime)) {
+                const driverAllowance = config.driver_allowance_per_day || (tier === "compact" ? 300 : (tier === "premium" ? 300 : (tier === "suv" ? 400 : 500)));
+                totalFare += driverAllowance;
+            }
+            return Math.round(totalFare);
         } else {
-            // Fallback for custom local point-to-point without flat-fares
+            // Fallback for custom intercity point-to-point without flat-fares
             const distanceCost = actualDistance * config.rate_per_km;
             const baseCost = config.base_cost || (tier === "compact" ? 250 : (tier === "premium" ? 300 : (tier === "suv" ? 500 : 700)));
             return Math.round(baseCost + distanceCost);

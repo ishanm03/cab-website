@@ -34,6 +34,25 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 
 ---
 
+## Phase 0.5: Local Environment Setup
+**Goal**: Establish a Docker-based emulation suite for local development mirroring Google Cloud and Firebase architecture.
+
+### 🏃 Sprint 0.5: Docker Compose & Firebase Emulators Configuration
+* **Migration Tasks**:
+  1. Create `backend/Dockerfile` scaffold.
+  2. Create `firebase.json` local emulator suite configuration.
+  3. Create root `docker-compose.yml` declaring `firebase-emulator`, `api-backend`, and `static-frontend` containers on a shared bridge network.
+  4. Set environment variables (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`) for Python.
+  5. Implement conditional redirect in client-side Firebase configuration (`modules/shared/firebase.js`) to target the emulator ports if running on `localhost`.
+* **Test & Validation Scenarios**:
+  * Execute `docker-compose up --build`.
+  * Verify:
+    * Frontend resolves on `http://localhost:8080` (static-frontend)
+    * Backend Swagger UI API docs resolve on `http://localhost:8000/docs` (api-backend)
+    * Firebase Emulator Suite UI resolves on `http://localhost:4000` (firebase-emulator)
+
+---
+
 ## Phase 1: Backend Foundation and Security
 **Goal**: Build a secure FastAPI scaffolding verified with Firebase custom claims token validation.
 

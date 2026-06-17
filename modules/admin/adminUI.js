@@ -971,7 +971,8 @@ async function handleApprovalFormSubmit(e) {
                 booking.fare_details.vehicle_tier,
                 null,
                 booking.trip_details.rental_hours || 0,
-                activeRates
+                activeRates,
+                booking.trip_details.pickup_time
             );
 
             const discount = !isNaN(discountOverride) && discountOverride >= 0 ? discountOverride : (booking.fare_details?.discount_amount || 0);
@@ -2140,6 +2141,19 @@ async function runRetrospectiveUpdates() {
                 });
                 console.log(`[Retrospective Sync] Updated fare matrix settings to include Compact and Premium Ride.`);
             }
+        } else {
+            console.log("[Retrospective Sync] Seeding default fare configuration matrix into settings/rates...");
+            await setDoc(ratesDocRef, {
+                rates: {
+                    compact: { base_cost: 250, rate_per_km: 10.00, rate_per_hour: 120.00, driver_allowance_per_day: 300.00 },
+                    premium: { base_cost: 300, rate_per_km: 12.00, rate_per_hour: 150.00, driver_allowance_per_day: 300.00 },
+                    suv:     { base_cost: 500, rate_per_km: 15.00, rate_per_hour: 200.00, driver_allowance_per_day: 400.00 },
+                    muv:     { base_cost: 700, rate_per_km: 18.00, rate_per_hour: 250.00, driver_allowance_per_day: 500.00 }
+                },
+                active_version_id: "R-default",
+                updated_ts: serverTimestamp()
+            });
+            console.log("[Retrospective Sync] Default fare configuration matrix seeded successfully.");
         }
 
         // 4. Seed Predefined Locations if empty
@@ -3283,6 +3297,7 @@ async function updateAdminRouteAndFare() {
         }
     }
     
+    const pickupTimeStr = adminBookingTime ? adminBookingTime.value : null;
     let computedBaseFare = 0;
     try {
         const ratesResponse = await bookingService.fetchRates();
@@ -3295,7 +3310,8 @@ async function updateAdminRouteAndFare() {
             tier,
             metrics,
             hours,
-            activeRates
+            activeRates,
+            pickupTimeStr
         );
     } catch (e) {
         console.error("Error computing booking fare:", e);
@@ -3306,7 +3322,8 @@ async function updateAdminRouteAndFare() {
             tier,
             metrics,
             hours,
-            null
+            null,
+            pickupTimeStr
         );
     }
     

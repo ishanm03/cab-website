@@ -675,8 +675,10 @@ async function handleStep1Submit(e) {
             }
         } catch (err) {
             console.warn("Flat fares query failed, falling back to static/dynamic calculation:", err);
-            // Fallback check static routesMatrix
-            metrics = getRouteMetrics(pickup, drop);
+            // Fallback check static routesMatrix (only for non-local categories like intercity)
+            if (category !== "local") {
+                metrics = getRouteMetrics(pickup, drop);
+            }
         }
     }
 
@@ -717,7 +719,7 @@ async function handleStep1Submit(e) {
             const soldOutOverlay = card.querySelector(".sold-out-overlay");
 
             // Calculate fare dynamically
-            const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics, currentRouteData.hours, activeRates);
+            const fare = bookingService.calculateFare(category, currentRouteData.km, days, tier, metrics, currentRouteData.hours, activeRates, currentRouteData.timeString);
             
             if (isCustomBooking) {
                 fareDisplay.innerHTML = `₹${fare.toLocaleString("en-IN")}<span class="block text-[10px] text-slate-500 font-normal">Base Rate</span>`;
