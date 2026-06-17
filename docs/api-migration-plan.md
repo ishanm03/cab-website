@@ -1,4 +1,4 @@
-# FastAPI API Migration Plan for IshanCabs (Version 0.3)
+# FastAPI API Migration Plan for IshanCabs (Version 0.4)
 
 ## Summary
 This migration plan details the conversion of IshanCabs from a client-direct Firebase architecture to a secure, modular FastAPI backend. 
@@ -36,8 +36,9 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
    * **Security Outcome**: Admin privileges are granted and audited centrally, not inferred from browser state.
 7. **Single Real-Time Strategy per Surface**:
    * **Principle**: Each UI surface should have one authoritative read path, not parallel client-Firestore and backend-streaming implementations.
-   * **Near-Term Migration**: Polling or backend-managed streaming may be used as transitional delivery mechanisms, but the long-term architecture should converge on backend-owned protected reads.
-   * **Admin Surfaces**: Admin dashboards should eventually use backend APIs for both list reads and real-time updates if real-time behavior remains necessary at scale.
+   * **Admin Surfaces**: Admin dashboards should use backend APIs for protected reads and a backend-managed Server-Sent Events (SSE) stream for near-real-time invalidation events from the start of the secure admin migration.
+   * **Delivery Model**: SSE events should stay lightweight, such as `bookings_updated`, `fleet_updated`, `drivers_updated`, or `settings_updated`, and the frontend should refetch the corresponding REST endpoint after receiving an event.
+   * **Non-Admin Surfaces**: Rider history and low-frequency views may use standard request/response fetches unless clear product needs justify realtime behavior.
    * **Scale Outcome**: This avoids duplicate infrastructure, conflicting authorization paths, and operational complexity across multiple realtime channels.
 8. **Modular Domain-Oriented Backend Design**:
    * **Module Boundaries**: The backend is organized by domain modules such as auth, profiles, bookings, activity, admin_bookings, fleet, drivers, offers, settings, and locations.
@@ -74,7 +75,7 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
   2. Create `firebase.json` local emulator suite configuration.
   3. Create root `docker-compose.yml` declaring `firebase-emulator`, `api-backend`, and `static-frontend` containers on a shared bridge network.
   4. Set environment variables (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`) for Python.
-  5. Implement conditional redirect in client-side Firebase configuration (`modules/shared/firebase.js`) to target the emulator ports if running on `localhost`.
+  5. Implement local-only client Firebase configuration support in `modules/shared/firebase.js` for authentication emulator use during transition, while keeping protected application reads and writes routed through FastAPI.
 * **Test & Validation Scenarios**:
   * Execute `docker-compose up --build`.
   * Verify:
@@ -128,6 +129,7 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 ### 🏃 Sprint 2.2: Settings & Metadata Catalogs
 * **Migration Tasks**:
   1. Move predefined metadata queries behind endpoints: `GET /api/v1/settings/rates`, `GET /api/v1/locations`, and `GET /api/v1/flat-fares`.
+  2. Treat these endpoints as the canonical application read path for protected and business-relevant configuration data.
 * **Test & Validation Scenarios**:
   * Compare JSON structures returned from endpoints against frontend configuration files to ensure 100% naming compliance.
 
@@ -153,14 +155,14 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 * **Migration Tasks**:
   1. Implement `POST /api/v1/bookings/quote`.
   2. Backend computes distance (via OSRM) and fare totals across all tiers (using active settings rates and matching flat fares).
-  3. Returns quote parameters alongside a cryptographically signed HMAC token (`quote_signature`) containing: `base_fare`, `distance_km`, `vehicle_tier`, and a `15-minute expiration timestamp`.
+  3. Returns quote parameters alongside a cryptographically signed HMAC token (`quote_signature`) or equivalent signed quote payload containing: user identity, route inputs, ride type, selected tier, promo context, distance, fare components, rate version, and a short expiration timestamp such as 15 minutes.
 * **Test & Validation Scenarios**:
   * Verify the endpoint returns quote details and a signature string. Assert signature changes if quote details are manually tampered with.
 
 ### 🏃 Sprint 3.3: Booking Document Writes
 * **Migration Tasks**:
   1. Implement booking creation `POST /api/v1/bookings`.
-  2. Backend verifies quote signature and timestamp.
+  2. Backend verifies quote signature and timestamp, then revalidates the booking-critical inputs before persisting the booking.
   3. Writes booking document to Firestore, mapping `booking_channel: "website"`.
 * **Test & Validation Scenarios**:
   * Test checkout: submitting request with valid quote signature logs booking in Firestore.
@@ -191,12 +193,16 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 ## Phase 5: Admin Booking Dispatch Operations
 **Goal**: Secure booking status transitions and geocoded approvals.
 
-### 🏃 Sprint 5.1: Live Dashboard Websocket Feed
+### 🏃 Sprint 5.1: Admin Read Path and SSE Delivery
 * **Migration Tasks**:
-  1. Set up WebSocket or Server-Sent Events (SSE) route `/api/v1/ws/admin/bookings`.
-  2. Implement background Firestore snapshot listener on the backend that broadcasts changes to active admin feeds.
+  1. Implement canonical admin read endpoints for booking lists, filters, counters, and detail views through FastAPI.
+  2. Implement one backend-managed SSE endpoint for admin invalidation events.
+  3. Emit lightweight event types such as `bookings_updated`, `fleet_updated`, `drivers_updated`, and `settings_updated` instead of streaming full document payloads initially.
+  4. Refetch canonical REST endpoints on the frontend when an SSE event is received, without reintroducing direct client Firestore reads for protected data.
 * **Test & Validation Scenarios**:
-  * Verify real-time messages are received by the client when a document is updated in Firestore.
+  * Verify admin dashboards render only from backend endpoints.
+  * Verify SSE events are received by the client when relevant Firestore-backed resources change.
+  * Verify the frontend refreshes the correct REST resource after each SSE invalidation event.
 
 ### 🏃 Sprint 5.2: Atomic Allocation and Approval
 * **Migration Tasks**:
@@ -226,6 +232,7 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 * **Migration Tasks**:
   1. Implement CRUD routes under `/api/v1/admin/fleet`.
   2. Enforce bidirectional links: updating a vehicle's driver automatically updates the driver's vehicle link, clearing stale references.
+  3. Represent driver and vehicle operational availability explicitly enough to support deterministic allocation checks under transaction control.
 * **Test & Validation Scenarios**:
   * Test endpoints, verifying that adding or editing a vehicle syncs associations atomically to Firestore.
 
@@ -260,7 +267,7 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 ---
 
 ## Phase 8: Frontend Client Refactor
-**Goal**: Replace all client-side Firestore writes and direct catalog reads with HTTP wrapper calls.
+**Goal**: Replace all protected client-side Firestore reads and all client-side Firestore writes with HTTP wrapper calls.
 
 ### 🏃 Sprint 8.1: API Client setup
 * **Migration Tasks**:
@@ -286,9 +293,11 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
 ### 🏃 Sprint 8.4: Admin Dashboard Refactor
 * **Migration Tasks**:
   1. Refactor `adminUI.js` to call REST endpoints for status transitions, fleet registry edits, geocoded acceptances, and settings updates.
-  2. Maintain real-time feeds using WebSockets or Server-Sent Events.
+  2. Read dashboard lists, counters, and details from backend endpoints only.
+  3. Subscribe to the backend SSE stream and trigger targeted REST refetches when invalidation events are received.
 * **Test & Validation Scenarios**:
-  * Verify that creating bookings, changing settings, and starting rides updates dashboard tables instantly.
+  * Verify that creating bookings, changing settings, and starting rides update dashboard tables through backend-owned read paths.
+  * Verify that updates arrive through the single backend-managed SSE channel and refresh only the affected frontend views.
 
 ---
 
@@ -302,17 +311,42 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
      rules_version = '2';
      service cloud.firestore {
        match /databases/{database}/documents {
-         // Clients can read catalogs, settings, or their own bookings/profile
+         // Default deny. Only explicitly allowed client reads remain.
          match /users/{userId} {
            allow read: if request.auth != null && request.auth.uid == userId;
            allow write: if false; // BACKEND ONLY
          }
          match /bookings/{bookingId} {
-           allow read: if request.auth != null && (resource.data.customer_id == request.auth.uid || request.auth.token.admin == true);
+           allow read: if false; // PROTECTED READS VIA BACKEND
            allow write: if false; // BACKEND ONLY
          }
+         match /vehicles/{vehicleId} {
+           allow read, write: if false; // BACKEND ONLY
+         }
+         match /drivers/{driverId} {
+           allow read, write: if false; // BACKEND ONLY
+         }
+         match /offers/{offerId} {
+           allow read: if false; // PROTECTED READS VIA BACKEND
+           allow write: if false; // BACKEND ONLY
+         }
+         match /locations/{locationId} {
+           allow read: if false; // PROTECTED READS VIA BACKEND
+           allow write: if false; // BACKEND ONLY
+         }
+         match /flat_fares/{flatFareId} {
+           allow read: if false; // PROTECTED READS VIA BACKEND
+           allow write: if false; // BACKEND ONLY
+         }
+         match /settings/{documentId} {
+           allow read: if false; // PROTECTED READS VIA BACKEND
+           allow write: if false; // BACKEND ONLY
+         }
+         match /rates_history/{documentId} {
+           allow read, write: if false; // BACKEND ONLY
+         }
          match /{document=**} {
-           allow read: if request.auth != null;
+           allow read: if false;
            allow write: if false; // BACKEND ONLY
          }
        }
@@ -320,6 +354,7 @@ This migration plan details the conversion of IshanCabs from a client-direct Fir
      ```
 * **Test & Validation Scenarios**:
   * Attempt write mutations directly from frontend browser console. Verify all write attempts are blocked with permission errors.
+  * Attempt direct client reads against protected operational collections. Verify they are rejected and that equivalent backend API reads continue to function.
 
 ### 🏃 Sprint 9.2: Code Cleanup and Auditing
 * **Migration Tasks**:
